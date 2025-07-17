@@ -12,6 +12,13 @@ export const addColumn = async (req, res) => {
 };
 
 export const deleteColumn = async (req, res) => {
-  await Column.findByIdAndDelete(req.params.id);
-  res.json({ message: "Deleted" });
+  try {
+    const deleted = await Column.findOneAndDelete({ _id: req.params.id });
+    if (!deleted) {
+      return res.status(404).json({ message: "Column topilmadi" });
+    }
+    res.json({ message: "Column va unga bog'liq applicationlar o'chirildi" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 };
