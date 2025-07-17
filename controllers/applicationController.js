@@ -31,3 +31,32 @@ export const updateColumn = async (req, res) => {
     res.status(400).json({ error: error.message });
   }
 };
+
+export const updateApplicationStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    const application = await Application.findById(id);
+    if (!application) {
+      return res.status(404).json({ message: "Ariza topilmadi" });
+    }
+
+    // Eski statusni eslab qolamiz
+    const oldStatus = application.status;
+
+    // Agar status "active" ga o'zgarayotgan bo‘lsa
+    if (status === "active" && oldStatus !== "active") {
+      application.columnId = null; // ustun bilan bog‘liqlikni uzamiz
+    }
+
+    // Statusni yangilaymiz
+    application.status = status;
+    await application.save();
+
+    res.status(200).json({ message: "Status yangilandi", application });
+  } catch (error) {
+    console.error("Status yangilash xatosi:", error);
+    res.status(500).json({ message: "Server xatosi" });
+  }
+};

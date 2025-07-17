@@ -10,9 +10,13 @@ const applicationSchema = new mongoose.Schema({
   location: String,
   groupId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "Group", // <-- asosiy o'zgarish shu
+    ref: "Group",
   },
-  status: String,
+  status: {
+    type: String,
+    enum: ["new", "active"], // faqat ushbu qiymatlar qabul qilinadi
+    default: "new", // ixtiyoriy: standart qiymat
+  },
   description: String,
   admin: String,
   columnId: {
@@ -28,5 +32,6 @@ const applicationSchema = new mongoose.Schema({
     default: Date.now,
   },
 });
+
 
 export default mongoose.model("Application", applicationSchema);
