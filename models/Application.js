@@ -1,17 +1,32 @@
 import mongoose from "mongoose";
 
 const applicationSchema = new mongoose.Schema({
-  name: String,
+  name: {
+    type: String,
+    required: true,
+  },
   lastname: String,
   phone: String,
   location: String,
-  gurup: String,
+  groupId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Group", // <-- asosiy o'zgarish shu
+  },
   status: String,
   description: String,
   admin: String,
-  createdAt: { type: Date, default: Date.now },
-  columnId: { type: mongoose.Schema.Types.ObjectId, ref: "Column" },
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" }, // kim qo'shgan
+  columnId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Column",
+  },
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
 });
 
 export default mongoose.model("Application", applicationSchema);
