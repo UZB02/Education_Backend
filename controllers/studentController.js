@@ -33,11 +33,27 @@ export const importActiveApplications = async (req, res) => {
 export const getAllStudents = async (req, res) => {
   try {
     const { adminId } = req.params;
+    const { page = 1, limit = 10 } = req.query;
 
-    const students = await Student.find({ admin: adminId }).populate("groupId");
-    res.status(200).json(students);
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const [students, total] = await Promise.all([
+      Student.find({ admin: adminId })
+        .populate("groupId")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(parseInt(limit)),
+      Student.countDocuments({ admin: adminId }),
+    ]);
+
+    res.status(200).json({
+      students,
+      total,
+      page: parseInt(page),
+      pages: Math.ceil(total / limit),
+    });
   } catch (error) {
-    console.error("Talabalar olishda xatolik:", error);
+    console.error("Studentlarni olishda xatolik:", error);
     res.status(500).json({ message: "Xatolik yuz berdi", error });
   }
 };

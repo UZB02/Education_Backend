@@ -84,3 +84,28 @@ export const updateApplicationStatus = async (req, res) => {
     res.status(500).json({ message: "Server xatosi" });
   }
 };
+
+export const updateApplication = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updatedApplication = await Application.findByIdAndUpdate(
+      id,
+      req.body,
+      {
+        new: true,
+        runValidators: true,
+      }
+    );
+
+    if (!updatedApplication) {
+      return res.status(404).json({ message: "Ariza topilmadi" });
+    }
+
+    res
+      .status(200)
+      .json({ message: "Ariza yangilandi", application: updatedApplication });
+  } catch (error) {
+    console.error("Arizani yangilash xatosi:", error);
+    res.status(500).json({ message: "Server xatosi", error: error.message });
+  }
+};
