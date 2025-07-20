@@ -1,5 +1,5 @@
 import Group from "../models/groupModel.js";
-import Application from "../models/Application.js";
+import Student from "../models/studentModel.js";
 
 // GET: get all groups by adminId (from query)
 export const getAllGroups = async (req, res) => {
@@ -12,18 +12,18 @@ export const getAllGroups = async (req, res) => {
     // 1. Barcha guruhlarni olamiz
     const groups = await Group.find({ admin: adminId }).populate("teacher");
 
-    // 2. Har bir guruh uchun groupId asosida applicationsni qo‘shamiz
-    const groupsWithApplications = await Promise.all(
+    // 2. Har bir guruh uchun groupId asosida studentlarni qo‘shamiz
+    const groupsWithStudents = await Promise.all(
       groups.map(async (group) => {
-        const applications = await Application.find({ groupId: group._id });
+        const students = await Student.find({ groupId: group._id });
         return {
-          ...group.toObject(), // group ni oddiy JS objectga aylantiramiz
-          applications, // qo‘shamiz
+          ...group.toObject(),
+          students,
         };
       })
     );
 
-    res.json(groupsWithApplications);
+    res.json(groupsWithStudents);
   } catch (error) {
     console.error("❌ getAllGroups xatolik:", error);
     res.status(500).json({ message: "Error fetching groups", error });
@@ -40,15 +40,20 @@ export const getGroupById = async (req, res) => {
       return res.status(400).json({ message: "adminId is required" });
     }
 
-    const group = await Group.findOne({ _id: id, admin: adminId })
-      .populate("teacher")
-      .populate("students");
+    const group = await Group.findOne({ _id: id, admin: adminId }).populate(
+      "teacher"
+    );
 
     if (!group) {
       return res.status(404).json({ message: "Group not found" });
     }
 
-    res.json(group);
+    const students = await Student.find({ groupId: id });
+
+    res.json({
+      ...group.toObject(),
+      students,
+    });
   } catch (error) {
     res.status(500).json({ message: "Error fetching group", error });
   }
@@ -57,7 +62,7 @@ export const getGroupById = async (req, res) => {
 // POST: create group with adminId (from body)
 export const createGroup = async (req, res) => {
   try {
-    const { name, description, students, teacher, adminId } = req.body;
+    const { name, description, teacher, adminId } = req.body;
 
     if (!adminId) {
       return res.status(400).json({ message: "adminId is required" });
@@ -66,7 +71,6 @@ export const createGroup = async (req, res) => {
     const newGroup = new Group({
       name,
       description,
-      students,
       teacher,
       admin: adminId,
       createdAtCustom: new Date(),
@@ -83,7 +87,7 @@ export const createGroup = async (req, res) => {
 // PUT: update group only if adminId matches
 export const updateGroup = async (req, res) => {
   try {
-    const { name, description, students, teacher, adminId } = req.body;
+    const { name, description, teacher, adminId } = req.body;
     const { id } = req.params;
 
     if (!adminId) {
@@ -95,7 +99,6 @@ export const updateGroup = async (req, res) => {
       {
         name,
         description,
-        students,
         teacher,
         updatedAtCustom: new Date(),
       },

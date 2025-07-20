@@ -1,4 +1,5 @@
 import Application from "../models/Application.js";
+import Student from "../models/studentModel.js";
 
 export const getByAdmin = async (req, res) => {
   try {
@@ -32,6 +33,7 @@ export const updateColumn = async (req, res) => {
   }
 };
 
+
 export const updateApplicationStatus = async (req, res) => {
   try {
     const { id } = req.params;
@@ -42,17 +44,39 @@ export const updateApplicationStatus = async (req, res) => {
       return res.status(404).json({ message: "Ariza topilmadi" });
     }
 
-    // Eski statusni eslab qolamiz
     const oldStatus = application.status;
 
-    // Agar status "active" ga o'zgarayotgan bo‘lsa
+    // Status active bo'layotgan bo'lsa
     if (status === "active" && oldStatus !== "active") {
-      application.columnId = null; // ustun bilan bog‘liqlikni uzamiz
+      application.columnId = null;
     }
 
-    // Statusni yangilaymiz
     application.status = status;
     await application.save();
+
+    // Status active bo'lganidan keyin studentga qo'shamiz
+    if (status === "active" && oldStatus !== "active") {
+      const existingStudent = await Student.findOne({
+        applicationId: application._id,
+      });
+
+      // Student allaqachon mavjud bo'lmasa, qo'shamiz
+      if (!existingStudent) {
+        const newStudent = new Student({
+          name: application.name,
+          lastname: application.lastname,
+          phone: application.phone,
+          location: application.location,
+          groupId: application.groupId,
+          description: application.description,
+          admin: application.admin,
+          applicationId: application._id,
+        });
+
+        await newStudent.save();
+      }
+      await Application.findByIdAndDelete(id);
+    }
 
     res.status(200).json({ message: "Status yangilandi", application });
   } catch (error) {

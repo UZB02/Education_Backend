@@ -7,6 +7,7 @@ import applicationRoutes from "./routes/applicationRoutes.js";
 import columnRoutes from "./routes/columnRoutes.js";
 import groupRouters from "./routes/groupRoutes.js"
 import teacherRoutes  from "./routes/teacherRoutes.js"
+import studentRoutes from "./routes/studentRoutes.js";
 
 dotenv.config();
 
@@ -19,6 +20,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/applications", applicationRoutes);
 app.use("/api/groups", groupRouters);
 app.use("/api/teachers", teacherRoutes);
+app.use("/api/students", studentRoutes);
 
 mongoose
   .connect(process.env.MONGO_URI)
