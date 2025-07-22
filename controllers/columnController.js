@@ -22,3 +22,19 @@ export const deleteColumn = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+// Yangi qo‘shilgan updateColumn funksiyasi
+export const updateColumn = async (req, res) => {
+  try {
+    const updated = await Column.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+      runValidators: true,
+    });
+    if (!updated) {
+      return res.status(404).json({ message: "Column topilmadi" });
+    }
+    res.json(updated);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};

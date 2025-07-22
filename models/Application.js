@@ -11,6 +11,7 @@ const applicationSchema = new mongoose.Schema({
   groupId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Group",
+    default: null,
   },
   status: {
     type: String,

@@ -13,6 +13,6 @@ router.get("/:adminId", getByAdmin);
 router.post("/", addApplication);
 router.put("/:id/move", updateColumn);
 router.put("/:id/status", updateApplicationStatus);
-router.put("/applications/:id", updateApplication);
+router.put("/:id", updateApplication);
 
 export default router;

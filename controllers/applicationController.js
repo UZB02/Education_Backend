@@ -3,7 +3,8 @@ import Student from "../models/studentModel.js";
 
 export const getByAdmin = async (req, res) => {
   try {
-    const applications = await Application.find({ admin: req.params.adminId });
+    const applications = await Application.find({ admin: req.params.adminId })
+    .sort({ createdAt: -1 });
     res.json(applications);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -75,7 +76,7 @@ export const updateApplicationStatus = async (req, res) => {
 
         await newStudent.save();
       }
-      await Application.findByIdAndDelete(id);
+      // await Application.findByIdAndDelete(id); Application ichidan o'chirish 
     }
 
     res.status(200).json({ message: "Status yangilandi", application });
