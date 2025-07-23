@@ -4,7 +4,8 @@ import {
   getAllStudents,
   addStudent,
   deleteStudent,
-  updateStudent
+  updateStudent,
+  getStudentById
 } from "../controllers/studentController.js";
 
 const router = express.Router();
@@ -15,6 +16,7 @@ router.post("/import", importActiveApplications);
 
 // Barcha studentlarni olish
 router.get("/:adminId", getAllStudents);
+router.get("/byId/:id", getStudentById);
 router.delete("/:id", deleteStudent); 
 router.put("/:id", updateStudent);
 
