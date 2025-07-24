@@ -67,11 +67,11 @@ export const syncBalanceToReal = async (req, res) => {
     }
 
     const payments = await Payment.aggregate([
-      { $match: { admin: new mongoose.Types.ObjectId(userId) } },
+      { $match: { userId: new mongoose.Types.ObjectId(userId) } }, // ✅ to‘g‘rilandi
       { $group: { _id: null, total: { $sum: "$amount" } } },
     ]);
     const expenses = await Expense.aggregate([
-      { $match: { admin: new mongoose.Types.ObjectId(userId) } },
+      { $match: { userId: new mongoose.Types.ObjectId(userId) } }, // ✅ to‘g‘rilandi
       { $group: { _id: null, total: { $sum: "$amount" } } },
     ]);
 
@@ -94,6 +94,7 @@ export const syncBalanceToReal = async (req, res) => {
     res.status(500).json({ message: "Server xatosi" });
   }
 };
+
 
 export const createNewBalance = async (req, res) => {
   try {

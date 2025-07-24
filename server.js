@@ -11,6 +11,7 @@ import studentRoutes from "./routes/studentRoutes.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
 import balanceRoutes from "./routes/balanceRoutes.js";
 import expenseRoutes from "./routes/expenseRoutes.js";
+import dashboardRoutes from "./routes/dashboardRoutes.js";
 
 dotenv.config();
 
@@ -28,6 +29,7 @@ app.use("/api/students", studentRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/balance", balanceRoutes);
 app.use("/api/expense", expenseRoutes);
+app.use("/api/dashboard", dashboardRoutes);
 
 // Connect to DB
 mongoose

@@ -1,8 +1,7 @@
-// controllers/expenseController.js
 import Expense from "../models/ExpenseModel.js";
 import { getOrCreateBalance } from "../utils/balanceUtils.js";
 
-// Xarajat qo‘shish
+// 🟢 1. Xarajat qo‘shish
 export const addExpense = async (req, res) => {
   try {
     const { amount, description, userId } = req.body;
@@ -25,7 +24,7 @@ export const addExpense = async (req, res) => {
   }
 };
 
-// Xarajatni o‘chirish
+// 🟡 2. Xarajatni o‘chirish
 export const deleteExpense = async (req, res) => {
   try {
     const { id } = req.params;
@@ -35,7 +34,7 @@ export const deleteExpense = async (req, res) => {
       return res.status(404).json({ message: "Chiqim topilmadi" });
     }
 
-    const balance = await getOrCreateBalance(expense.userId); // ✅ TO‘G‘RI QILINDI
+    const balance = await getOrCreateBalance(expense.userId);
 
     balance.amount += expense.amount;
     balance.updatedAt = new Date();
@@ -54,10 +53,17 @@ export const deleteExpense = async (req, res) => {
   }
 };
 
-// Barcha xarajatlar
+// 🔵 3. Foydalanuvchining barcha xarajatlari (userId bo‘yicha)
 export const getAllExpenses = async (req, res) => {
   try {
-    const expenses = await Expense.find().sort({ spentAt: -1 });
+    const userId = req.query.userId || req.body.userId;
+
+    if (!userId) {
+      return res.status(400).json({ message: "userId kerak" });
+    }
+
+    const expenses = await Expense.find({ userId }).sort({ spentAt: -1 });
+
     res.status(200).json(expenses);
   } catch (err) {
     console.error("Chiqimlar ro‘yxatini olishda xatolik:", err);

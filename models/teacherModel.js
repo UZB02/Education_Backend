@@ -14,6 +14,15 @@ const teacherSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    points: {
+      type: Number,
+      default: 0,
+    },
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User", // yoki "Admin", agar siz adminlar ro'yxatini yuritsangiz
+      required: true,
+    },
   },
   { timestamps: true }
 );
