@@ -5,19 +5,20 @@ import cors from "cors";
 import authRoutes from "./routes/authRoutes.js";
 import applicationRoutes from "./routes/applicationRoutes.js";
 import columnRoutes from "./routes/columnRoutes.js";
-import groupRouters from "./routes/groupRoutes.js"
-import teacherRoutes  from "./routes/teacherRoutes.js"
+import groupRouters from "./routes/groupRoutes.js";
+import teacherRoutes from "./routes/teacherRoutes.js";
 import studentRoutes from "./routes/studentRoutes.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
 import balanceRoutes from "./routes/balanceRoutes.js";
 import expenseRoutes from "./routes/expenseRoutes.js";
-import { getOrCreateBalance } from "./utils/balanceUtils.js";
+
 dotenv.config();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Routes
 app.use("/api/columns", columnRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/applications", applicationRoutes);
@@ -28,6 +29,7 @@ app.use("/api/payments", paymentRoutes);
 app.use("/api/balance", balanceRoutes);
 app.use("/api/expense", expenseRoutes);
 
+// Connect to DB
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() =>
@@ -36,5 +38,3 @@ mongoose
     )
   )
   .catch((err) => console.log(err));
-
-  await getOrCreateBalance();

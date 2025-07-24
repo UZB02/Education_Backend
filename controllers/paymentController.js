@@ -2,16 +2,15 @@ import Payment from "../models/PaymentModel.js";
 import Student from "../models/studentModel.js";
 import { getOrCreateBalance } from "../utils/balanceUtils.js";
 
-// Yangi to‘lov qo‘shish
-
-// 1. To‘lov (payment) qo‘shish va balansni oshirish
-
+// 1. Yangi to‘lov qo‘shish
 export const addPayment = async (req, res) => {
   try {
-    const { studentId, amount, method, description, admin } = req.body;
+    const { studentId, amount, method, description, userId } = req.body;
 
-    if (!amount || amount <= 0) {
-      return res.status(400).json({ message: "Yaroqli miqdor kiriting" });
+    if (!userId || !amount || amount <= 0) {
+      return res
+        .status(400)
+        .json({ message: "userId va yaroqli miqdor kerak" });
     }
 
     const payment = await Payment.create({
@@ -19,10 +18,10 @@ export const addPayment = async (req, res) => {
       amount,
       method,
       description,
-      admin,
+      userId,
     });
 
-    const balance = await getOrCreateBalance();
+    const balance = await getOrCreateBalance(userId);
     balance.amount += amount;
     balance.updatedAt = new Date();
     await balance.save();
@@ -34,7 +33,7 @@ export const addPayment = async (req, res) => {
   }
 };
 
-// Bitta o‘quvchining to‘lovlari
+// 2. Bitta o‘quvchining to‘lovlari
 export const getPaymentsByStudent = async (req, res) => {
   try {
     const { studentId } = req.params;
@@ -45,19 +44,23 @@ export const getPaymentsByStudent = async (req, res) => {
   }
 };
 
-// Barcha to‘lovlar
+// 3. Foydalanuvchining barcha to‘lovlari
 export const getAllPayments = async (req, res) => {
   try {
-    const payments = await Payment.find()
+    const { userId } = req.query;
+    const query = userId ? { userId } : {};
+
+    const payments = await Payment.find(query)
       .populate("studentId", "name lastname")
       .sort({ paidAt: -1 });
+
     res.json(payments);
   } catch (error) {
     res.status(500).json({ message: "To‘lovlarni olishda xatolik", error });
   }
 };
 
-// To‘lovni yangilash
+// 4. To‘lovni yangilash
 export const updatePayment = async (req, res) => {
   try {
     const { id } = req.params;
@@ -71,7 +74,7 @@ export const updatePayment = async (req, res) => {
   }
 };
 
-// To‘lovni o‘chirish
+// 5. To‘lovni o‘chirish
 export const deletePayment = async (req, res) => {
   try {
     const { id } = req.params;
@@ -83,7 +86,7 @@ export const deletePayment = async (req, res) => {
   }
 };
 
-// 🆕 To‘lovlar tarixi + umumiy summa (qarzdorliksiz)
+// 6. O‘quvchi bo‘yicha to‘lovlar tarixi + umumiy miqdor
 export const getStudentPaymentHistory = async (req, res) => {
   try {
     const { studentId } = req.params;

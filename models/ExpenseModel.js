@@ -9,9 +9,7 @@ const expenseSchema = new mongoose.Schema({
     type: String,
     default: "",
   },
-  admin: {
-    type: String,
-  },
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, },
   spentAt: {
     type: Date,
     default: Date.now,

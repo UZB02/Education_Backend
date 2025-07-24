@@ -22,9 +22,7 @@ const paymentSchema = new mongoose.Schema({
     type: String,
     default: "",
   },
-  admin: {
-    type: String, // admin ismi yoki ID
-  },
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
 });
 
 export default mongoose.model("Payment", paymentSchema);
