@@ -1,9 +1,13 @@
 import mongoose from "mongoose";
+import Balance from "../models/BalanceModel.js";
 import Payment from "../models/PaymentModel.js";
 import Expense from "../models/ExpenseModel.js";
-import { getOrCreateBalance } from "../utils/balanceUtils.js";
+import {
+  getOrCreateBalance,
+  updateBalanceAmount,
+} from "../utils/balanceUtils.js";
 
-// 1. Real-time hisoblangan balans (foydalanuvchiga tegishli)
+// 1. Real-time hisoblangan balans (update bilan)
 export const getRealBalance = async (req, res) => {
   try {
     const userId = req.body?.userId || req.query?.userId || req.params?.userId;
@@ -12,19 +16,7 @@ export const getRealBalance = async (req, res) => {
       return res.status(400).json({ message: "userId kerak" });
     }
 
-    const payments = await Payment.aggregate([
-      { $match: { userId: new mongoose.Types.ObjectId(userId) } }, // <-- to‘g‘rilandi
-      { $group: { _id: null, total: { $sum: "$amount" } } },
-    ]);
-
-    const expenses = await Expense.aggregate([
-      { $match: { userId: new mongoose.Types.ObjectId(userId) } }, // <-- to‘g‘rilandi
-      { $group: { _id: null, total: { $sum: "$amount" } } },
-    ]);
-
-    const income = payments[0]?.total || 0;
-    const outcome = expenses[0]?.total || 0;
-    const balance = income - outcome;
+    const { income, outcome, balance } = await updateBalanceAmount(userId);
 
     res.status(200).json({ income, outcome, balance });
   } catch (err) {
@@ -33,8 +25,7 @@ export const getRealBalance = async (req, res) => {
   }
 };
 
-
-// 2. Qo‘lda balansga pul qo‘shish (foydalanuvchiga alohida)
+// 2. Qo‘lda balansga pul qo‘shish
 export const increaseBalance = async (req, res) => {
   try {
     const { amount, userId } = req.body;
@@ -57,37 +48,24 @@ export const increaseBalance = async (req, res) => {
   }
 };
 
-// 3. Balansni real qiymatga sinxronizatsiya qilish
+// 3. Balansni real qiymatga sinxronizatsiya qilish (agar alohida chaqirmoqchi bo‘lsangiz)
 export const syncBalanceToReal = async (req, res) => {
   try {
-    const userId = req.body.userId || req.query.userId || req.params.userId;
+    const userId = req.body?.userId || req.query?.userId || req.params?.userId;
 
     if (!userId) {
       return res.status(400).json({ message: "userId kerak" });
     }
 
-    const payments = await Payment.aggregate([
-      { $match: { userId: new mongoose.Types.ObjectId(userId) } }, // ✅ to‘g‘rilandi
-      { $group: { _id: null, total: { $sum: "$amount" } } },
-    ]);
-    const expenses = await Expense.aggregate([
-      { $match: { userId: new mongoose.Types.ObjectId(userId) } }, // ✅ to‘g‘rilandi
-      { $group: { _id: null, total: { $sum: "$amount" } } },
-    ]);
-
-    const income = payments[0]?.total || 0;
-    const outcome = expenses[0]?.total || 0;
-    const realBalance = income - outcome;
-
-    const balance = await getOrCreateBalance(userId);
-    balance.amount = realBalance;
-    balance.updatedAt = new Date();
-    await balance.save();
+    const {
+      income,
+      outcome,
+      balance: realBalance,
+    } = await updateBalanceAmount(userId);
 
     res.status(200).json({
       message: "Balans real qiymatga moslashtirildi",
       realBalance,
-      balance,
     });
   } catch (err) {
     console.error("syncBalanceToReal xatolik:", err);
@@ -95,29 +73,3 @@ export const syncBalanceToReal = async (req, res) => {
   }
 };
 
-
-export const createNewBalance = async (req, res) => {
-  try {
-    const { userId } = req.body;
-
-    if (!userId) {
-      return res.status(400).json({ message: "userId kerak" });
-    }
-
-    // Avval mavjudligini tekshirib olamiz
-    const existing = await Balance.findOne({ userId });
-    if (existing) {
-      return res
-        .status(400)
-        .json({ message: "Bu foydalanuvchi uchun balans allaqachon mavjud" });
-    }
-
-    const balance = new Balance({ userId, amount: 0 });
-    await balance.save();
-
-    res.status(201).json({ message: "Yangi balans yaratildi", balance });
-  } catch (err) {
-    console.error("Balans yaratishda xatolik:", err);
-    res.status(500).json({ message: "Server xatosi" });
-  }
-};

@@ -12,6 +12,7 @@ import paymentRoutes from "./routes/paymentRoutes.js";
 import balanceRoutes from "./routes/balanceRoutes.js";
 import expenseRoutes from "./routes/expenseRoutes.js";
 import dashboardRoutes from "./routes/dashboardRoutes.js";
+import salaryRoutes from "./routes/salaryRoutes.js";
 
 dotenv.config();
 
@@ -30,7 +31,7 @@ app.use("/api/payments", paymentRoutes);
 app.use("/api/balance", balanceRoutes);
 app.use("/api/expense", expenseRoutes);
 app.use("/api/dashboard", dashboardRoutes);
-
+app.use("/api/salaries", salaryRoutes);
 // Connect to DB
 mongoose
   .connect(process.env.MONGO_URI)

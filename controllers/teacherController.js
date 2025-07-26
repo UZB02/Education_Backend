@@ -1,13 +1,38 @@
 import Teacher from "../models/teacherModel.js";
 
-// GET: Faqat kirgan userga tegishli o'qituvchilar
+// GET: Faqat kirgan userga tegishli o'qituvchilar + maoshlar tarixi
 export const getAllTeachers = async (req, res) => {
   const { userId } = req.query;
   try {
-    const teachers = await Teacher.find({ userId });
+    const teachers = await Teacher.find({ userId })
+      .populate("salaries") // maoshlar tarixi ni olish
+      .sort({ createdAt: -1 });
+
     res.json(teachers);
   } catch (error) {
     res.status(500).json({ message: "O'qituvchilarni olishda xatolik", error });
+  }
+};
+
+// GET: Bitta o‘qituvchini olish va unga tegishli maoshlar tarixi bilan
+export const getTeacherById = async (req, res) => {
+  const { id } = req.params;
+  const { userId } = req.query;
+
+  try {
+    const teacher = await Teacher.findOne({ _id: id, userId })
+      .populate({
+        path: "salaries",
+        options: { sort: { month: -1 } }, // Oy bo‘yicha kamayish tartibida
+      });
+
+    if (!teacher) {
+      return res.status(404).json({ message: "O‘qituvchi topilmadi yoki sizga tegishli emas" });
+    }
+
+    res.json(teacher);
+  } catch (error) {
+    res.status(500).json({ message: "O‘qituvchini olishda xatolik", error });
   }
 };
 

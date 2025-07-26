@@ -1,5 +1,6 @@
 import Expense from "../models/ExpenseModel.js";
 import { getOrCreateBalance } from "../utils/balanceUtils.js";
+import SalaryHistory from "../models/salaryHistoryModel.js";
 
 // 🟢 1. Xarajat qo‘shish
 export const addExpense = async (req, res) => {
@@ -34,17 +35,26 @@ export const deleteExpense = async (req, res) => {
       return res.status(404).json({ message: "Chiqim topilmadi" });
     }
 
+    // 1. Balansga pulni qaytarish
     const balance = await getOrCreateBalance(expense.userId);
-
     balance.amount += expense.amount;
     balance.updatedAt = new Date();
     await balance.save();
 
+    // 2. Agar bu chiqim maosh bilan bog‘liq bo‘lsa — tarixdan ham o‘chirish
+    const deletedSalary = await SalaryHistory.findOneAndDelete({
+      amount: expense.amount,
+      userId: expense.userId,
+      description: expense.description, // muhim: faqat aynan o‘sha description bilan bog‘liq bo‘lsa
+    });
+
+    // 3. Chiqimni o‘chirish
     await Expense.findByIdAndDelete(id);
 
     res.status(200).json({
-      message: "Chiqim o‘chirildi va balans tiklandi",
+      message: "Chiqim o‘chirildi, balans tiklandi, maosh tarixi tozalandi",
       expense,
+      deletedSalary,
       balance,
     });
   } catch (err) {
