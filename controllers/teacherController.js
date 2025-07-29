@@ -39,14 +39,21 @@ export const getTeacherById = async (req, res) => {
 // POST: Yangi o'qituvchi qo'shish
 export const createTeacher = async (req, res) => {
   try {
-    const { name, lastname, science, userId } = req.body;
+    const { name, lastname, science, userId, phone, monthlySalary } = req.body;
     if (!name || !lastname || !science || !userId) {
       return res
         .status(400)
         .json({ message: "Barcha maydonlar to‘ldirilishi shart" });
     }
 
-    const newTeacher = new Teacher({ name, lastname, science, userId });
+    const newTeacher = new Teacher({
+      name,
+      lastname,
+      science,
+      userId,
+      phone,
+      monthlySalary,
+    });
     await newTeacher.save();
 
     res.status(201).json(newTeacher);
@@ -59,7 +66,7 @@ export const createTeacher = async (req, res) => {
 export const updateTeacher = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, lastname, science, userId } = req.body;
+    const { name, lastname, science, userId, phone, monthlySalary } = req.body;
 
     const teacher = await Teacher.findOne({ _id: id, userId });
     if (!teacher) {
@@ -69,13 +76,18 @@ export const updateTeacher = async (req, res) => {
     if (name) teacher.name = name;
     if (lastname) teacher.lastname = lastname;
     if (science) teacher.science = science;
+    if (phone) teacher.phone = phone;
+    if (typeof monthlySalary !== "undefined") {
+      teacher.monthlySalary = monthlySalary;
+    }
 
-    await teacher.save();
+    await teacher.save(); // 🟢 BU ham kerak
     res.status(200).json({ message: "O‘qituvchi yangilandi", teacher });
   } catch (error) {
     res.status(500).json({ message: "Yangilashda xatolik", error });
   }
 };
+
 
 // DELETE: Faqat o‘zining o‘qituvchisini o‘chirish
 export const deleteTeacher = async (req, res) => {

@@ -6,6 +6,7 @@ const teacherSchema = new mongoose.Schema(
     lastname: { type: String, required: true },
     science: { type: String, required: true },
     points: { type: Number, default: 0 },
+    phone: { type: String, required: false },
     monthlySalary: { type: Number, default: 0 },
     userId: {
       type: mongoose.Schema.Types.ObjectId,
