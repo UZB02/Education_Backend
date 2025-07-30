@@ -62,13 +62,70 @@ const expenses = await Expense.aggregate([
   const balance = await getOrCreateBalance(adminId);
 
   res.json([
+    { label: "To‘lovlar", value: payments[0]?.total || 0 },
+    { label: "Joriy Balans", value: balance.amount },
+    { label: "Xarajatlar", value: expenses[0]?.total || 0 },
     { label: "Arizalar", value: applications },
     { label: "O‘quvchilar", value: students },
-    { label: "To‘lovlar", value: payments[0]?.total || 0 },
-    { label: "Xarajatlar", value: expenses[0]?.total || 0 },
-    { label: "Balans", value: balance.balance },
   ]);
 };
+
+// 📈 Har oy bo‘yicha o‘quvchilar
+export const getStudentsByMonth = async (req, res) => {
+  const { adminId } = req.params;
+  const year = parseInt(req.query.year) || new Date().getFullYear();
+
+  try {
+    const Student = (await import("../models/studentModel.js")).default;
+
+    const results = await Student.aggregate([
+      {
+        $match: {
+          admin: adminId, // ❗ ObjectId emas, String bo'lishi kerak
+          createdAt: {
+            $gte: new Date(`${year}-01-01T00:00:00.000Z`),
+            $lt: new Date(`${year + 1}-01-01T00:00:00.000Z`),
+          },
+        },
+      },
+      {
+        $group: {
+          _id: { $month: "$createdAt" },
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    const months = Array(12).fill(0);
+    results.forEach((r) => {
+      months[r._id - 1] = r.count;
+    });
+
+    res.json({
+      labels: [
+        "Yanvar",
+        "Fevral",
+        "Mart",
+        "Aprel",
+        "May",
+        "Iyun",
+        "Iyul",
+        "Avgust",
+        "Sentabr",
+        "Oktabr",
+        "Noyabr",
+        "Dekabr",
+      ],
+      values: months,
+    });
+  } catch (error) {
+    console.error("Oylik o‘quvchilarni olishda xatolik:", error);
+    res
+      .status(500)
+      .json({ message: "O‘quvchilar statistikasi xatoligi", error });
+  }
+};
+
 
 
 // 📈 Har oy bo‘yicha arizalar

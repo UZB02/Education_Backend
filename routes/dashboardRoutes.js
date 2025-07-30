@@ -6,6 +6,7 @@ import {
   getExpensesByMonth,
   getBalanceByMonth,
   getRecentActivity,
+  getStudentsByMonth
 } from "../controllers/dashboardController.js";
 
 const router = express.Router();
@@ -16,5 +17,6 @@ router.get("/payments-by-month/:adminId", getPaymentsByMonth);
 router.get("/expenses-by-month/:adminId", getExpensesByMonth);
 router.get("/balance-by-month/:adminId", getBalanceByMonth);
 router.get("/recent-activity/:adminId", getRecentActivity);
+router.get("/students-by-month/:adminId", getStudentsByMonth); 
 
 export default router;
