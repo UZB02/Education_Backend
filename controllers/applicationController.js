@@ -110,3 +110,22 @@ export const updateApplication = async (req, res) => {
     res.status(500).json({ message: "Server xatosi", error: error.message });
   }
 };
+
+export const deleteApplication = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const deletedApplication = await Application.findByIdAndDelete(id);
+
+    if (!deletedApplication) {
+      return res.status(404).json({ message: "Ariza topilmadi" });
+    }
+
+    res
+      .status(200)
+      .json({ message: "Ariza o'chirildi", application: deletedApplication });
+  } catch (error) {
+    console.error("Arizani o'chirish xatosi:", error);
+    res.status(500).json({ message: "Server xatosi", error: error.message });
+  }
+};
