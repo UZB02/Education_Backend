@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import SalaryHistory from "../models/salaryHistoryModel.js";
 import Balance from "../models/BalanceModel.js";
-import Expense from "../models/ExpenseModel.js"; // ➕ Expense modeli
+import Expense from "../models/ExpenseModel.js";
 
 // 1. Maosh yaratish — balansdan ayirish va chiqimga yozish
 export const createSalary = async (req, res) => {
@@ -12,17 +12,15 @@ export const createSalary = async (req, res) => {
       return res.status(400).json({ message: "Barcha maydonlar kerak" });
     }
 
-    // 1. SalaryHistory saqlash
     const salary = new SalaryHistory({
       teacherId,
       amount,
       month,
       userId,
-      description, // ixtiyoriy
+      description,
     });
     await salary.save();
 
-    // 2. Balance dan amount ayirish
     const balance = await Balance.findOne({ userId });
 
     if (!balance) {
@@ -41,10 +39,9 @@ export const createSalary = async (req, res) => {
     balance.updatedAt = new Date();
     await balance.save();
 
-    // 3. Expense modeliga yozish (rashod)
     const expense = new Expense({
       amount,
-      description: description || `Oylik to‘lovi (${month})`, // fallback
+      description: description || `Oylik to‘lovi (${month})`,
       userId,
       spentAt: new Date(),
     });
@@ -77,7 +74,7 @@ export const getAllSalaries = async (req, res) => {
   }
 };
 
-// 3. Bitta o‘qituvchining maosh yozuvini olish (teacherId orqali)
+// 3. Bitta o‘qituvchining maosh yozuvini olish
 export const getSalaryByTeacherId = async (req, res) => {
   try {
     const { userId } = req.query;
@@ -92,7 +89,7 @@ export const getSalaryByTeacherId = async (req, res) => {
       userId,
     })
       .populate("teacherId", "name lastname")
-      .sort({ createdAt: -1 }); // Agar oxirgi yozuv kerak bo‘lsa
+      .sort({ createdAt: -1 });
 
     if (!salary) return res.status(404).json({ message: "Topilmadi" });
 
@@ -101,7 +98,6 @@ export const getSalaryByTeacherId = async (req, res) => {
     res.status(500).json({ message: "Xatolik", error: err.message });
   }
 };
-
 
 // 4. Maoshni yangilash
 export const updateSalary = async (req, res) => {
@@ -129,7 +125,6 @@ export const deleteSalary = async (req, res) => {
     const userId = req.query.userId || req.body.userId || req.params.userId;
     if (!userId) return res.status(400).json({ message: "userId kerak" });
 
-    // 1. O‘chirilayotgan maoshni topish
     const salary = await SalaryHistory.findOne({
       _id: req.params.id,
       userId,
@@ -137,7 +132,6 @@ export const deleteSalary = async (req, res) => {
 
     if (!salary) return res.status(404).json({ message: "Maosh topilmadi" });
 
-    // 2. Balansni topish va mablag‘ni qaytarish
     const balance = await Balance.findOne({ userId });
     if (!balance) return res.status(404).json({ message: "Balans topilmadi" });
 
@@ -145,29 +139,25 @@ export const deleteSalary = async (req, res) => {
     balance.updatedAt = new Date();
     await balance.save();
 
-    // 3. Expense yozuvini topish va o‘chirish
     const description = salary.description || `Oylik to‘lovi (${salary.month})`;
     const expense = await Expense.findOneAndDelete({
       amount: salary.amount,
-      description: description,
-      userId: userId,
+      description,
+      userId,
     });
 
-    // 4. SalaryHistory yozuvini o‘chirish
     await SalaryHistory.findByIdAndDelete(salary._id);
 
-    // 5. Javob
     res.json({
       message: "Maosh o‘chirildi, balansga qaytarildi va chiqim o‘chirildi",
       returnedAmount: salary.amount,
       newBalance: balance.amount,
-      expenseDeleted: !!expense, // true yoki false
+      expenseDeleted: !!expense,
     });
   } catch (err) {
     res.status(500).json({ message: "Xatolik", error: err.message });
   }
 };
-
 
 // 6. Statistika: har oy bo‘yicha userga tegishli maoshlar
 export const getMonthlySalaryStats = async (req, res) => {
@@ -193,6 +183,59 @@ export const getMonthlySalaryStats = async (req, res) => {
 
     res.json(stats);
   } catch (err) {
+    res.status(500).json({ message: "Xatolik", error: err.message });
+  }
+};
+
+// 7. ➕ Qisman to‘lov funksiyasi
+export const payPartialSalary = async (req, res) => {
+  try {
+    const { teacherId, userId, amount, description } = req.body;
+
+    if (!teacherId || !userId || !amount) {
+      return res.status(400).json({ message: "Barcha maydonlar kerak" });
+    }
+
+    const now = new Date();
+    const month = `${now.getFullYear()}-${(now.getMonth() + 1)
+      .toString()
+      .padStart(2, "0")}`;
+
+    const balance = await Balance.findOne({ userId });
+    if (!balance) return res.status(404).json({ message: "Balans topilmadi" });
+
+    if (balance.amount < amount) {
+      return res.status(400).json({ message: "Balansda mablag' yetarli emas" });
+    }
+
+    const salary = new SalaryHistory({
+      teacherId,
+      amount,
+      month,
+      userId,
+      description: description || `Oylik to‘lovi (qisman) - ${month}`,
+    });
+    await salary.save();
+
+    balance.amount -= amount;
+    balance.updatedAt = new Date();
+    await balance.save();
+
+    const expense = new Expense({
+      amount,
+      userId,
+      spentAt: new Date(),
+      description: salary.description,
+    });
+    await expense.save();
+
+    res.status(201).json({
+      message: "Qisman maosh to‘landi",
+      salary,
+      newBalance: balance.amount,
+    });
+  } catch (err) {
+    console.error("payPartialSalary xatolik:", err);
     res.status(500).json({ message: "Xatolik", error: err.message });
   }
 };

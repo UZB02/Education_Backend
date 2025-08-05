@@ -6,6 +6,7 @@ import {
   updateSalary,
   deleteSalary,
   getMonthlySalaryStats,
+  payPartialSalary
 } from "../controllers/salaryController.js";
 
 const router = express.Router();
@@ -17,5 +18,6 @@ router.get("/stats", getMonthlySalaryStats); // statistik grafik uchun
 router.get("/:teacherId", getSalaryByTeacherId);
 router.put("/:id", updateSalary); // yangilash
 router.delete("/:id", deleteSalary); // o‘chirish
+router.post("/pay-part", payPartialSalary);
 
 export default router;
