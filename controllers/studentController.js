@@ -1,5 +1,6 @@
 import Application from "../models/Application.js";
 import Student from "../models/studentModel.js";
+import Payment from "../models/PaymentModel.js";
 
 // Active bo'lgan applicationlarni studentsga qo'shish
 export const importActiveApplications = async (req, res) => {
@@ -37,7 +38,7 @@ export const getAllStudents = async (req, res) => {
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    const [students, total] = await Promise.all([
+    const [studentsRaw, total] = await Promise.all([
       Student.find({ admin: adminId })
         .populate("groupId")
         .sort({ createdAt: -1 })
@@ -45,6 +46,44 @@ export const getAllStudents = async (req, res) => {
         .limit(parseInt(limit)),
       Student.countDocuments({ admin: adminId }),
     ]);
+
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    const startDate = new Date(year, month, 1);
+    const endDate = new Date(year, month + 1, 0, 23, 59, 59);
+
+    const students = await Promise.all(
+      studentsRaw.map(async (student) => {
+        const group = student.groupId;
+        let paymentStatus = null;
+
+        if (group && group.monthlyFee) {
+          const payments = await Payment.find({
+            studentId: student._id,
+            paidAt: { $gte: startDate, $lte: endDate },
+          });
+
+          const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
+          const isPaid = totalPaid >= group.monthlyFee;
+          const remainingAmount = Math.max(group.monthlyFee - totalPaid, 0);
+
+          paymentStatus = {
+            isPaid,
+            totalPaid,
+            remainingAmount,
+            message: isPaid
+              ? "To'langan"
+              : "Qarzdor",
+          };
+        }
+
+        return {
+          ...student.toObject(),
+          paymentStatus,
+        };
+      })
+    );
 
     res.status(200).json({
       students,
@@ -162,7 +201,52 @@ export const getStudentById = async (req, res) => {
       return res.status(404).json({ message: "Student topilmadi" });
     }
 
-    res.status(200).json({ student });
+    const group = student.groupId;
+    let paymentStatus = null;
+
+    if (group && group.monthlyFee) {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = now.getMonth();
+
+      const startDate = new Date(year, month, 1);
+      const endDate = new Date(year, month + 1, 0, 23, 59, 59);
+
+      const payments = await Payment.find({
+        studentId: id,
+        paidAt: { $gte: startDate, $lte: endDate },
+      });
+
+      const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
+      const isPaid = totalPaid >= group.monthlyFee;
+      const remainingAmount = Math.max(group.monthlyFee - totalPaid, 0);
+      const overpaidAmount = Math.max(totalPaid - group.monthlyFee, 0);
+
+      let message = "To'lanmagan";
+      if (isPaid && overpaidAmount > 0) {
+        message = "Haqdor";
+      } else if (isPaid) {
+        message = "To'langan";
+      } else {
+        message = "Qarzdor";
+      }
+
+      paymentStatus = {
+        isPaid,
+        totalPaid,
+        remainingAmount,
+        overpaidAmount,
+        message,
+      };
+    }
+
+    // student obyektiga paymentStatus ni qo‘shamiz
+    const studentWithStatus = {
+      ...student.toObject(),
+      paymentStatus,
+    };
+
+    res.status(200).json({ student: studentWithStatus });
   } catch (error) {
     console.error("Studentni olishda xatolik:", error);
     res.status(500).json({ message: "Serverda xatolik yuz berdi", error });

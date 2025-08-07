@@ -19,7 +19,12 @@ const groupSchema = new mongoose.Schema(
     admin: {
       type: mongoose.Schema.Types.ObjectId,
       required: true,
-      ref: "Admin", // yoki "User" bo‘lsa, mos model nomini yozing
+      ref: "Admin",
+    },
+    monthlyFee: {
+      type: Number,
+      required: true, // har doim kiritilishi shart bo‘lsa
+      min: 0,
     },
     createdAtCustom: {
       type: Date,

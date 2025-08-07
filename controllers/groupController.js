@@ -1,5 +1,6 @@
 import Group from "../models/groupModel.js";
 import Student from "../models/studentModel.js";
+import Payment from "../models/PaymentModel.js";
 
 // GET: get all groups by adminId (from query)
 export const getAllGroups = async (req, res) => {
@@ -48,16 +49,51 @@ export const getGroupById = async (req, res) => {
       return res.status(404).json({ message: "Group not found" });
     }
 
+    // O‘quvchilar ro‘yxati
     const students = await Student.find({ groupId: id });
+
+    // Hozirgi oy boshi va oxiri
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+
+    const startDate = new Date(year, month, 1);
+    const endDate = new Date(year, month + 1, 0, 23, 59, 59);
+
+    // Har bir o‘quvchining to‘lov statusini qo‘shamiz
+    const studentsWithPaymentStatus = await Promise.all(
+      students.map(async (student) => {
+        const payments = await Payment.find({
+          studentId: student._id,
+          paidAt: { $gte: startDate, $lte: endDate },
+        });
+
+        const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
+        const isPaid = totalPaid >= group.monthlyFee;
+
+        return {
+          ...student.toObject(),
+          paymentStatus: {
+            isPaid,
+            totalPaid,
+            message: isPaid
+              ? "To'langan"
+              : "Qarzdor",
+          },
+        };
+      })
+    );
 
     res.json({
       ...group.toObject(),
-      students,
+      students: studentsWithPaymentStatus,
     });
   } catch (error) {
+    console.error("getGroupById error:", error);
     res.status(500).json({ message: "Error fetching group", error });
   }
 };
+
 
 // POST: create group with adminId (from body)
 export const createGroup = async (req, res) => {
