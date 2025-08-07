@@ -98,7 +98,7 @@ export const getGroupById = async (req, res) => {
 // POST: create group with adminId (from body)
 export const createGroup = async (req, res) => {
   try {
-    const { name, description, teacher, adminId } = req.body;
+    const { name, description, teacher, monthlyFee, adminId } = req.body;
 
     if (!adminId) {
       return res.status(400).json({ message: "adminId is required" });
@@ -106,6 +106,7 @@ export const createGroup = async (req, res) => {
 
     const newGroup = new Group({
       name,
+      monthlyFee,
       description,
       teacher,
       admin: adminId,
@@ -123,7 +124,7 @@ export const createGroup = async (req, res) => {
 // PUT: update group only if adminId matches
 export const updateGroup = async (req, res) => {
   try {
-    const { name, description, teacher, adminId } = req.body;
+    const { name, description, teacher, monthlyFee, adminId } = req.body;
     const { id } = req.params;
 
     if (!adminId) {
@@ -134,6 +135,7 @@ export const updateGroup = async (req, res) => {
       { _id: id, admin: adminId },
       {
         name,
+        monthlyFee,
         description,
         teacher,
         updatedAtCustom: new Date(),
