@@ -5,7 +5,8 @@ import {
   addStudent,
   deleteStudent,
   updateStudent,
-  getStudentById
+  getStudentById,
+  sendCustomMessage
 } from "../controllers/studentController.js";
 
 const router = express.Router();
@@ -19,5 +20,6 @@ router.get("/:adminId", getAllStudents);
 router.get("/byId/:id", getStudentById);
 router.delete("/:id", deleteStudent); 
 router.put("/:id", updateStudent);
+router.post("/send-message", sendCustomMessage);
 
 export default router;

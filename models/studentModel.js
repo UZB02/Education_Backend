@@ -18,6 +18,11 @@ const studentSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: "Application",
   },
+  chatId: {
+    // ✅ Telegram chat ID
+    type: Number,
+    default: null,
+  },
   createdAt: {
     type: Date,
     default: Date.now,

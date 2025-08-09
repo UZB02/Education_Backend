@@ -1,7 +1,7 @@
 import Application from "../models/Application.js";
 import Student from "../models/studentModel.js";
 import Payment from "../models/PaymentModel.js";
-
+import { sendMessageToUser } from "../bot/bot.js";
 // Active bo'lgan applicationlarni studentsga qo'shish
 export const importActiveApplications = async (req, res) => {
   try {
@@ -250,5 +250,22 @@ export const getStudentById = async (req, res) => {
   } catch (error) {
     console.error("Studentni olishda xatolik:", error);
     res.status(500).json({ message: "Serverda xatolik yuz berdi", error });
+  }
+};
+
+// O‘quvchiga xabar yuborish
+export const sendCustomMessage = async (req, res) => {
+  try {
+    const { studentId, message } = req.body;
+    const student = await Student.findById(studentId);
+
+    if (!student || !student.chatId) {
+      return res.status(404).json({ error: "O‘quvchi yoki chatId topilmadi" });
+    }
+
+    await sendMessageToUser(student.chatId, message);
+    res.json({ success: true, message: "Xabar yuborildi ✅" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 };
