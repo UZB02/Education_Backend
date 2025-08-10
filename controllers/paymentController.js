@@ -1,7 +1,7 @@
 import Payment from "../models/PaymentModel.js";
 import Student from "../models/studentModel.js";
 import { getOrCreateBalance } from "../utils/balanceUtils.js";
-
+import { sendMessageToUser } from "../bot/bot.js"; 
 // 1. Yangi to‘lov qo‘shish
 export const addPayment = async (req, res) => {
   try {
@@ -11,8 +11,7 @@ export const addPayment = async (req, res) => {
       return res
         .status(400)
         .json({ message: "userId va yaroqli miqdor kerak" });
-    }
-
+    }    // Yangi to‘lov qo‘shish
     const payment = await Payment.create({
       studentId,
       amount,
@@ -21,12 +20,68 @@ export const addPayment = async (req, res) => {
       userId,
     });
 
+    // Balansni yangilash
     const balance = await getOrCreateBalance(userId);
     balance.amount += amount;
     balance.updatedAt = new Date();
     await balance.save();
 
-    res.status(201).json({ message: "To‘lov qo‘shildi", payment, balance });
+    // Studentni topish (gruppasi bilan)
+    const student = await Student.findById(studentId).populate("groupId");
+    if (!student) {
+      return res.status(404).json({ message: "Talaba topilmadi" });
+    }
+
+    // Joriy oy uchun to‘langan summalarni olish
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+    const monthlyPayments = await Payment.find({
+      studentId,
+      paidAt: { $gte: startOfMonth, $lte: endOfMonth },
+    });
+
+    const totalPaid = monthlyPayments.reduce((sum, p) => sum + p.amount, 0);
+    const monthlyFee = student.groupId?.monthlyFee || 0;
+
+    let paymentStatus = {
+      isPaid: false,
+      message: "Qarzdor",
+      overpaidAmount: 0,
+      remainingAmount: 0,
+      totalPaid,
+    };
+
+    if (totalPaid >= monthlyFee) {
+      paymentStatus.isPaid = true;
+      paymentStatus.message = "To‘langan";
+      paymentStatus.overpaidAmount = totalPaid - monthlyFee;
+    } else {
+      paymentStatus.remainingAmount = monthlyFee - totalPaid;
+    }
+
+    // Agar chatId mavjud bo‘lsa — Telegramga xabar yuborish
+    if (student.chatId) {
+      await sendMessageToUser(
+        student.chatId,
+        `💳 Hurmatli ${student.name}, ${student.lastname},\n` +
+          `${amount} so‘m to‘lov qabul qilindi.\n` +
+          `To‘lov usuli: ${method || "Noma'lum"}\n\n` +
+          `📅 Joriy oy holati:\n` +
+          `- Holat: ${paymentStatus.message}\n` +
+          `- Jami to‘langan: ${totalPaid} so‘m\n` +
+          `- Qolgan summa: ${paymentStatus.remainingAmount} so‘m\n` +
+          `- Ortiqcha to‘lov: ${paymentStatus.overpaidAmount} so‘m`
+      );
+    }
+
+    res.status(201).json({
+      message: "To‘lov qo‘shildi",
+      payment,
+      balance,
+      paymentStatus,
+    });
   } catch (err) {
     console.error("To‘lov qo‘shishda xatolik:", err);
     res.status(500).json({ message: "Server xatosi" });
