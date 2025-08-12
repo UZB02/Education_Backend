@@ -104,7 +104,7 @@ export const getTeacherById = async (req, res) => {
 // POST: Yangi o'qituvchi qo'shish
 export const createTeacher = async (req, res) => {
   try {
-    const { name, lastname, science, userId, phone, monthlySalary } = req.body;
+    const { name, lastname, science, userId, phone, percentage } = req.body;
     if (!name || !lastname || !science || !userId) {
       return res
         .status(400)
@@ -117,7 +117,7 @@ export const createTeacher = async (req, res) => {
       science,
       userId,
       phone,
-      monthlySalary,
+      percentage,
     });
     await newTeacher.save();
 
@@ -131,7 +131,7 @@ export const createTeacher = async (req, res) => {
 export const updateTeacher = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, lastname, science, userId, phone, monthlySalary } = req.body;
+    const { name, lastname, science, userId, phone, percentage } = req.body;
 
     const teacher = await Teacher.findOne({ _id: id, userId });
     if (!teacher) {
@@ -142,8 +142,8 @@ export const updateTeacher = async (req, res) => {
     if (lastname) teacher.lastname = lastname;
     if (science) teacher.science = science;
     if (phone) teacher.phone = phone;
-    if (typeof monthlySalary !== "undefined") {
-      teacher.monthlySalary = monthlySalary;
+    if (typeof percentage !== "undefined") {
+      teacher.percentage = percentage;
     }
 
     await teacher.save(); // 🟢 BU ham kerak

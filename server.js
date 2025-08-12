@@ -13,6 +13,8 @@ import balanceRoutes from "./routes/balanceRoutes.js";
 import expenseRoutes from "./routes/expenseRoutes.js";
 import dashboardRoutes from "./routes/dashboardRoutes.js";
 import salaryRoutes from "./routes/salaryRoutes.js";
+import teacherAuthRoutes from "./routes/teacherAuthRoutes.js";
+import attendanceRoutes from "./routes/attendanceRoutes.js";
 
 dotenv.config();
 
@@ -32,6 +34,8 @@ app.use("/api/balance", balanceRoutes);
 app.use("/api/expense", expenseRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/salaries", salaryRoutes);
+app.use("/api/teacher-auth", teacherAuthRoutes);
+app.use("/api/attendance", attendanceRoutes);
 // Connect to DB
 mongoose
   .connect(process.env.MONGO_URI)
