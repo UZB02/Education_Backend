@@ -153,3 +153,36 @@ export const getAttendanceHistoryByGroupId = async (req, res) => {
   }
 };
 
+export const getAttendanceHistoryByGroup = async (req, res) => {
+  try {
+    const { groupId } = req.params;
+
+    if (!groupId) {
+      return res.status(400).json({ message: "groupId kiritilishi shart" });
+    }
+
+    // Guruhdagi barcha o‘quvchilarni olish
+    const students = await Student.find({ groupId }).select("_id");
+    const studentIds = students.map((s) => s._id);
+
+    if (studentIds.length === 0) {
+      return res
+        .status(404)
+        .json({ message: "Ushbu guruhda o‘quvchi topilmadi" });
+    }
+
+    // Davomat tarixini olish
+    const records = await Attendance.find({
+      studentId: { $in: studentIds },
+    })
+      .populate("studentId", "name lastname")
+      .sort({ date: -1 });
+
+    res.json(records);
+  } catch (error) {
+    console.error("❌ Davomat tarixini olishda xatolik:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+

@@ -4,7 +4,8 @@ import {
   markAttendance,
   getAttendanceHistory,
   getByGroupId,
-  getAttendanceHistoryByGroupId // <-- yangi funksiyani import qiling
+  getAttendanceHistoryByGroupId,
+  getAttendanceHistoryByGroup // <-- yangi funksiyani import qiling
 } from "../controllers/attendanceController.js";
 import { teacherAuth } from "../middleware/teacherAuthMiddleware.js";
 
@@ -19,6 +20,9 @@ router.get(
   teacherAuth,
   getAttendanceHistoryByGroupId
 );
+router.get("/public-history/:groupId", getAttendanceHistoryByGroup);
+
+
 
 
 export default router;
