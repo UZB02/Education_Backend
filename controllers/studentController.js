@@ -190,57 +190,165 @@ export const updateStudent = async (req, res) => {
   }
 };
 
-// ID bo‘yicha bitta studentni olish
+// ID bo‘yicha bitta studentni olish + qarzdor oylar
+// Yordamchi funksiyalar
+const dayToIndex = {
+  Dushanba: 1,
+  Seshanba: 2,
+  Chorshanba: 3,
+  Payshanba: 4,
+  Juma: 5,
+  Shanba: 6,
+  Yakshanba: 7,
+};
+
+// Shu oyda berilgan kunlar qancha bor
+function getTotalDaysInMonth(year, month, dayIndex) {
+  const date = new Date(year, month, 1);
+  let count = 0;
+  while (date.getMonth() === month) {
+    if (date.getDay() === dayIndex % 7) count++;
+    date.setDate(date.getDate() + 1);
+  }
+  return count;
+}
+
+// Shu kundan keyin berilgan kunlar qancha bor
+function getRemainingDaysInMonth(year, month, dayIndex, startDay) {
+  const date = new Date(year, month, startDay);
+  let count = 0;
+  while (date.getMonth() === month) {
+    if (date.getDay() === dayIndex % 7 && date.getDate() >= startDay) count++;
+    date.setDate(date.getDate() + 1);
+  }
+  return count;
+}
+
 export const getStudentById = async (req, res) => {
   try {
     const { id } = req.params;
-
     const student = await Student.findById(id).populate("groupId");
 
-    if (!student) {
-      return res.status(404).json({ message: "Student topilmadi" });
-    }
+    if (!student) return res.status(404).json({ message: "Student topilmadi" });
 
     const group = student.groupId;
     let paymentStatus = null;
 
     if (group && group.monthlyFee) {
+      const monthlyFee = group.monthlyFee;
+      const startDate = student.joinedAt || student.createdAt;
       const now = new Date();
-      const year = now.getFullYear();
-      const month = now.getMonth();
 
-      const startDate = new Date(year, month, 1);
-      const endDate = new Date(year, month + 1, 0, 23, 59, 59);
+      const months = [];
+      let current = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
 
-      const payments = await Payment.find({
-        studentId: id,
-        paidAt: { $gte: startDate, $lte: endDate },
-      });
+      let totalPaidAll = 0;
+      while (current <= now) {
+        const startOfMonth = new Date(
+          current.getFullYear(),
+          current.getMonth(),
+          1
+        );
+        const endOfMonth = new Date(
+          current.getFullYear(),
+          current.getMonth() + 1,
+          0,
+          23,
+          59,
+          59
+        );
 
-      const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
-      const isPaid = totalPaid >= group.monthlyFee;
-      const remainingAmount = Math.max(group.monthlyFee - totalPaid, 0);
-      const overpaidAmount = Math.max(totalPaid - group.monthlyFee, 0);
+        // Oydagi dars kunlari
+        const allDaysInMonth = group.days.reduce((sum, day) => {
+          return (
+            sum +
+            getTotalDaysInMonth(
+              current.getFullYear(),
+              current.getMonth(),
+              dayToIndex[day]
+            )
+          );
+        }, 0);
 
-      let message = "To'lanmagan";
-      if (isPaid && overpaidAmount > 0) {
-        message = "Haqdor";
-      } else if (isPaid) {
-        message = "To'langan";
-      } else {
-        message = "Qarzdor";
+        // Qo‘shilgan kundan keyingi darslar (faqat birinchi oy uchun)
+        let daysLeft = allDaysInMonth;
+        if (
+          current.getFullYear() === startDate.getFullYear() &&
+          current.getMonth() === startDate.getMonth()
+        ) {
+          daysLeft = group.days.reduce((sum, day) => {
+            return (
+              sum +
+              getRemainingDaysInMonth(
+                current.getFullYear(),
+                current.getMonth(),
+                dayToIndex[day],
+                startDate.getDate()
+              )
+            );
+          }, 0);
+        }
+
+        // Pro-rata summa
+        const feeForThisMonth =
+          allDaysInMonth > 0
+            ? Math.round(monthlyFee * (daysLeft / allDaysInMonth))
+            : 0;
+
+        // Shu oy uchun to‘lovlar
+        const payments = await Payment.find({
+          studentId: id,
+          paidAt: { $gte: startOfMonth, $lte: endOfMonth },
+        });
+        const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
+        totalPaidAll += totalPaid;
+
+        months.push({
+          month: current.toLocaleString("uz-UZ", {
+            month: "long",
+            year: "numeric",
+          }),
+          totalPaid,
+          remainingAmount: Math.max(feeForThisMonth - totalPaid, 0),
+          overpaidAmount: Math.max(totalPaid - feeForThisMonth, 0),
+          message: totalPaid >= feeForThisMonth ? "To'langan" : "Qarzdor",
+        });
+
+        current.setMonth(current.getMonth() + 1);
+      }
+
+      // Umumiy holat
+      const shouldPayTotal = months.reduce(
+        (sum, m) => sum + (m.remainingAmount + m.totalPaid),
+        0
+      );
+      const remainingAmountAll = Math.max(shouldPayTotal - totalPaidAll, 0);
+      const overpaidAmountAll = Math.max(totalPaidAll - shouldPayTotal, 0);
+      const isPaid = totalPaidAll >= shouldPayTotal;
+      const overallMessage = isPaid
+        ? overpaidAmountAll > 0
+          ? "Haqdor"
+          : "To'langan"
+        : "Qarzdor";
+
+      // Agar barcha qarzlar to'langan bo'lsa, qarzdor oylarni ham "To'langan" ga o'zgartirish
+      if (isPaid) {
+        months.forEach((m) => {
+          if (m.message === "Qarzdor") m.message = "To'langan";
+        });
       }
 
       paymentStatus = {
+        months,
+        totalPaid: totalPaidAll,
+        shouldPayTotal,
+        remainingAmount: remainingAmountAll,
+        overpaidAmount: overpaidAmountAll,
         isPaid,
-        totalPaid,
-        remainingAmount,
-        overpaidAmount,
-        message,
+        overallMessage,
       };
     }
 
-    // student obyektiga paymentStatus ni qo‘shamiz
     const studentWithStatus = {
       ...student.toObject(),
       paymentStatus,

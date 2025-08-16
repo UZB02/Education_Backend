@@ -23,9 +23,31 @@ const groupSchema = new mongoose.Schema(
     },
     monthlyFee: {
       type: Number,
-      required: true, // har doim kiritilishi shart bo‘lsa
+      required: true,
       min: 0,
     },
+
+    // 📌 yangi maydonlar
+    scheduleType: {
+      type: String,
+      enum: ["toq", "juft", "custom"],
+      default: "custom",
+    },
+    days: [
+      {
+        type: String,
+        enum: [
+          "Dushanba",
+          "Seshanba",
+          "Chorshanba",
+          "Payshanba",
+          "Juma",
+          "Shanba",
+          "Yakshanba",
+        ],
+      },
+    ],
+
     createdAtCustom: {
       type: Date,
       default: Date.now,

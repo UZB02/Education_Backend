@@ -76,9 +76,7 @@ export const getGroupById = async (req, res) => {
           paymentStatus: {
             isPaid,
             totalPaid,
-            message: isPaid
-              ? "To'langan"
-              : "Qarzdor",
+            message: isPaid ? "To'langan" : "Qarzdor",
           },
         };
       })
@@ -94,14 +92,36 @@ export const getGroupById = async (req, res) => {
   }
 };
 
-
 // POST: create group with adminId (from body)
 export const createGroup = async (req, res) => {
   try {
-    const { name, description, teacher, monthlyFee, adminId } = req.body;
+    const {
+      name,
+      description,
+      teacher,
+      monthlyFee,
+      adminId,
+      scheduleType,
+      days,
+    } = req.body;
 
     if (!adminId) {
       return res.status(400).json({ message: "adminId is required" });
+    }
+
+    // Agar custom bo‘lsa -> days kerak
+    if (scheduleType === "custom" && (!days || days.length === 0)) {
+      return res
+        .status(400)
+        .json({ message: "Custom schedule requires days array" });
+    }
+
+    // Agar toq/juft bo‘lsa -> avtomatik belgilaymiz
+    let finalDays = days;
+    if (scheduleType === "toq") {
+      finalDays = ["Dushanba", "Chorshanba", "Juma"];
+    } else if (scheduleType === "juft") {
+      finalDays = ["Seshanba", "Payshanba", "Shanba"];
     }
 
     const newGroup = new Group({
@@ -110,6 +130,8 @@ export const createGroup = async (req, res) => {
       description,
       teacher,
       admin: adminId,
+      scheduleType,
+      days: finalDays,
       createdAtCustom: new Date(),
       updatedAtCustom: new Date(),
     });
@@ -124,11 +146,31 @@ export const createGroup = async (req, res) => {
 // PUT: update group only if adminId matches
 export const updateGroup = async (req, res) => {
   try {
-    const { name, description, teacher, monthlyFee, adminId } = req.body;
+    const {
+      name,
+      description,
+      teacher,
+      monthlyFee,
+      adminId,
+      scheduleType,
+      days,
+    } = req.body;
     const { id } = req.params;
 
     if (!adminId) {
       return res.status(400).json({ message: "adminId is required" });
+    }
+
+    // scheduleType asosida finalDays
+    let finalDays = days;
+    if (scheduleType === "toq") {
+      finalDays = ["Dushanba", "Chorshanba", "Juma"];
+    } else if (scheduleType === "juft") {
+      finalDays = ["Seshanba", "Payshanba", "Shanba"];
+    } else if (scheduleType === "custom" && (!days || days.length === 0)) {
+      return res
+        .status(400)
+        .json({ message: "Custom schedule requires days array" });
     }
 
     const updatedGroup = await Group.findOneAndUpdate(
@@ -138,6 +180,8 @@ export const updateGroup = async (req, res) => {
         monthlyFee,
         description,
         teacher,
+        scheduleType,
+        days: finalDays,
         updatedAtCustom: new Date(),
       },
       { new: true }
