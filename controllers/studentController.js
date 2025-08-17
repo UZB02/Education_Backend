@@ -199,29 +199,73 @@ const dayToIndex = {
   Payshanba: 4,
   Juma: 5,
   Shanba: 6,
-  Yakshanba: 7,
+  Yakshanba: 0,
 };
 
-// Shu oyda berilgan kunlar qancha bor
 function getTotalDaysInMonth(year, month, dayIndex) {
   const date = new Date(year, month, 1);
   let count = 0;
   while (date.getMonth() === month) {
-    if (date.getDay() === dayIndex % 7) count++;
+    if (date.getDay() === dayIndex) count++;
     date.setDate(date.getDate() + 1);
   }
   return count;
 }
 
-// Shu kundan keyin berilgan kunlar qancha bor
 function getRemainingDaysInMonth(year, month, dayIndex, startDay) {
   const date = new Date(year, month, startDay);
   let count = 0;
   while (date.getMonth() === month) {
-    if (date.getDay() === dayIndex % 7 && date.getDate() >= startDay) count++;
+    if (date.getDay() === dayIndex) count++;
     date.setDate(date.getDate() + 1);
   }
   return count;
+}
+
+function calculateMonthlyFee(group, year, month) {
+  const startOfMonth = new Date(year, month, 1);
+  const endOfMonth = new Date(year, month + 1, 0, 23, 59, 59);
+
+  const feeHistory = (group.monthlyFeeHistory || [])
+    .filter((f) => f.changedAt <= endOfMonth)
+    .sort((a, b) => a.changedAt - b.changedAt);
+
+  if (feeHistory.length === 0) return group.monthlyFee || 0;
+
+  let totalFee = 0;
+  let totalDaysInMonth = group.days.reduce(
+    (sum, day) => sum + getTotalDaysInMonth(year, month, dayToIndex[day]),
+    0
+  );
+
+  for (let i = 0; i < feeHistory.length; i++) {
+    const currentFee = feeHistory[i];
+    const nextChange = feeHistory[i + 1]?.changedAt || endOfMonth;
+
+    const start = new Date(Math.max(currentFee.changedAt, startOfMonth));
+    const end = new Date(Math.min(nextChange, endOfMonth));
+
+    let daysInPeriod = 0;
+    for (const day of group.days) {
+      const dayIndex = dayToIndex[day];
+      const tempDate = new Date(start);
+      while (tempDate <= end) {
+        if (tempDate.getDay() === dayIndex && tempDate.getMonth() === month) {
+          daysInPeriod++;
+        }
+        tempDate.setDate(tempDate.getDate() + 1);
+      }
+    }
+
+    const proportionalFee =
+      totalDaysInMonth > 0
+        ? Math.round(currentFee.amount * (daysInPeriod / totalDaysInMonth))
+        : 0;
+
+    totalFee += proportionalFee;
+  }
+
+  return totalFee;
 }
 
 export const getStudentById = async (req, res) => {
@@ -234,109 +278,116 @@ export const getStudentById = async (req, res) => {
     const group = student.groupId;
     let paymentStatus = null;
 
-    if (group && group.monthlyFee) {
-      const monthlyFee = group.monthlyFee;
+    if (group) {
       const startDate = student.joinedAt || student.createdAt;
       const now = new Date();
 
       const months = [];
       let current = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
 
+      const allPayments = await Payment.find({ studentId: id }).sort({
+        paidAt: 1,
+      });
+      let paymentPool = allPayments.map((p) => p.amount);
+      let paymentIndex = 0;
+
       let totalPaidAll = 0;
+      let carryOver = 0;
+      let carryOverTotalUsed = 0;
+
       while (current <= now) {
-        const startOfMonth = new Date(
-          current.getFullYear(),
-          current.getMonth(),
-          1
-        );
-        const endOfMonth = new Date(
-          current.getFullYear(),
-          current.getMonth() + 1,
-          0,
-          23,
-          59,
-          59
+        const year = current.getFullYear();
+        const month = current.getMonth();
+
+        const allDaysInMonth = group.days.reduce(
+          (sum, day) => sum + getTotalDaysInMonth(year, month, dayToIndex[day]),
+          0
         );
 
-        // Oydagi dars kunlari
-        const allDaysInMonth = group.days.reduce((sum, day) => {
-          return (
-            sum +
-            getTotalDaysInMonth(
-              current.getFullYear(),
-              current.getMonth(),
-              dayToIndex[day]
-            )
-          );
-        }, 0);
-
-        // Qo‘shilgan kundan keyingi darslar (faqat birinchi oy uchun)
         let daysLeft = allDaysInMonth;
         if (
-          current.getFullYear() === startDate.getFullYear() &&
-          current.getMonth() === startDate.getMonth()
+          year === startDate.getFullYear() &&
+          month === startDate.getMonth()
         ) {
-          daysLeft = group.days.reduce((sum, day) => {
-            return (
+          daysLeft = group.days.reduce(
+            (sum, day) =>
               sum +
               getRemainingDaysInMonth(
-                current.getFullYear(),
-                current.getMonth(),
+                year,
+                month,
                 dayToIndex[day],
                 startDate.getDate()
-              )
-            );
-          }, 0);
+              ),
+            0
+          );
         }
 
-        // Pro-rata summa
-        const feeForThisMonth =
+        const kursFee = calculateMonthlyFee(group, year, month);
+        const rawFee =
           allDaysInMonth > 0
-            ? Math.round(monthlyFee * (daysLeft / allDaysInMonth))
+            ? Math.round(kursFee * (daysLeft / allDaysInMonth))
             : 0;
+        const adjustedFee = rawFee;
 
-        // Shu oy uchun to‘lovlar
-        const payments = await Payment.find({
-          studentId: id,
-          paidAt: { $gte: startOfMonth, $lte: endOfMonth },
-        });
-        const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
+        let totalPaid = 0;
+        while (paymentIndex < paymentPool.length && totalPaid < adjustedFee) {
+          const remainingNeed = adjustedFee - totalPaid;
+          const available = paymentPool[paymentIndex];
+
+          if (available <= remainingNeed) {
+            totalPaid += available;
+            paymentIndex++;
+          } else {
+            totalPaid += remainingNeed;
+            paymentPool[paymentIndex] -= remainingNeed;
+          }
+        }
+
         totalPaidAll += totalPaid;
+
+        let remainingAmount = Math.max(adjustedFee - totalPaid, 0);
+        let carryOverUsed = Math.min(carryOver, remainingAmount);
+        remainingAmount -= carryOverUsed;
+        carryOver -= carryOverUsed;
+        carryOverTotalUsed += carryOverUsed;
+
+        const overpaidAmount = Math.max(
+          totalPaid + carryOverUsed - adjustedFee,
+          0
+        );
+        carryOver += overpaidAmount;
 
         months.push({
           month: current.toLocaleString("uz-UZ", {
             month: "long",
             year: "numeric",
           }),
+          kursFee,
+          rawFee,
+          adjustedFee,
+          carryOverUsed,
           totalPaid,
-          remainingAmount: Math.max(feeForThisMonth - totalPaid, 0),
-          overpaidAmount: Math.max(totalPaid - feeForThisMonth, 0),
-          message: totalPaid >= feeForThisMonth ? "To'langan" : "Qarzdor",
+          remainingAmount,
+          overpaidAmount,
+          message: remainingAmount === 0 ? "To'langan" : "Qarzdor",
         });
 
         current.setMonth(current.getMonth() + 1);
       }
 
-      // Umumiy holat
-      const shouldPayTotal = months.reduce(
-        (sum, m) => sum + (m.remainingAmount + m.totalPaid),
+      const shouldPayTotal = months.reduce((sum, m) => sum + m.adjustedFee, 0);
+      const remainingAmountAll = months.reduce(
+        (sum, m) => sum + m.remainingAmount,
         0
       );
-      const remainingAmountAll = Math.max(shouldPayTotal - totalPaidAll, 0);
-      const overpaidAmountAll = Math.max(totalPaidAll - shouldPayTotal, 0);
-      const isPaid = totalPaidAll >= shouldPayTotal;
+      const overpaidAmountAll = carryOver;
+      const isPaid = remainingAmountAll === 0;
+
       const overallMessage = isPaid
         ? overpaidAmountAll > 0
           ? "Haqdor"
           : "To'langan"
         : "Qarzdor";
-
-      // Agar barcha qarzlar to'langan bo'lsa, qarzdor oylarni ham "To'langan" ga o'zgartirish
-      if (isPaid) {
-        months.forEach((m) => {
-          if (m.message === "Qarzdor") m.message = "To'langan";
-        });
-      }
 
       paymentStatus = {
         months,
@@ -344,22 +395,19 @@ export const getStudentById = async (req, res) => {
         shouldPayTotal,
         remainingAmount: remainingAmountAll,
         overpaidAmount: overpaidAmountAll,
+        overpaidAmountUsed: carryOverTotalUsed,
         isPaid,
         overallMessage,
       };
     }
 
-    const studentWithStatus = {
-      ...student.toObject(),
-      paymentStatus,
-    };
-
-    res.status(200).json({ student: studentWithStatus });
+    res.status(200).json({ student: { ...student.toObject(), paymentStatus } });
   } catch (error) {
     console.error("Studentni olishda xatolik:", error);
     res.status(500).json({ message: "Serverda xatolik yuz berdi", error });
   }
 };
+
 
 // O‘quvchiga xabar yuborish
 export const sendCustomMessage = async (req, res) => {

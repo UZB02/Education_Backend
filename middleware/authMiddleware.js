@@ -1,25 +1,22 @@
+// middlewares/authMiddleware.js
 import jwt from "jsonwebtoken";
 
-export const authMiddleware = (req, res, next) => {
+const authMiddleware = (req, res, next) => {
+  const token = req.headers.authorization?.split(" ")[1];
+
+  if (!token) {
+    return res.status(401).json({ message: "Token topilmadi" });
+  }
+
   try {
-    // Headerdan tokenni olish
-    const authHeader = req.headers.authorization;
-
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ message: "Token topilmadi" });
-    }
-
-    const token = authHeader.split(" ")[1];
-
-    // Tokenni tekshirish
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-    // Decoded ma'lumotni requestga qo‘shish
-    req.user = decoded;
-
+    req.user = decoded; // foydalanuvchi ma'lumotlarini saqlaymiz
     next();
-  } catch (error) {
-    console.error("Auth xatosi:", error.message);
-    return res.status(401).json({ message: "Token yaroqsiz yoki muddati o‘tgan" });
+  } catch (err) {
+    return res
+      .status(403)
+      .json({ message: "Token noto‘g‘ri yoki muddati tugagan" });
   }
 };
+
+export default authMiddleware;
