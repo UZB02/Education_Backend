@@ -191,7 +191,8 @@ export const updateStudent = async (req, res) => {
 };
 
 // ID bo‘yicha bitta studentni olish + qarzdor oylar
-// Yordamchi funksiyalar
+
+// --- yordamchi funksiyalar ---
 const dayToIndex = {
   Dushanba: 1,
   Seshanba: 2,
@@ -199,7 +200,7 @@ const dayToIndex = {
   Payshanba: 4,
   Juma: 5,
   Shanba: 6,
-  Yakshanba: 0,
+  Yakshanba: 0, // JS'da Yakshanba = 0
 };
 
 function getTotalDaysInMonth(year, month, dayIndex) {
@@ -288,11 +289,12 @@ export const getStudentById = async (req, res) => {
       const allPayments = await Payment.find({ studentId: id }).sort({
         paidAt: 1,
       });
+
       let paymentPool = allPayments.map((p) => p.amount);
       let paymentIndex = 0;
 
       let totalPaidAll = 0;
-      let carryOver = 0;
+      let carryOver = 0; // haqdorlik yoki ortiqcha qism
       let carryOverTotalUsed = 0;
 
       while (current <= now) {
@@ -329,33 +331,45 @@ export const getStudentById = async (req, res) => {
             : 0;
         const adjustedFee = rawFee;
 
+        // Haqdorlikni ishlatib yuborish
+        let carryOverUsed = Math.min(carryOver, adjustedFee);
+        let requiredFee = adjustedFee - carryOverUsed;
+        carryOver -= carryOverUsed;
+        carryOverTotalUsed += carryOverUsed;
+
+        // Joriy oyning to‘lovi (TUZATILGAN)
         let totalPaid = 0;
-        while (paymentIndex < paymentPool.length && totalPaid < adjustedFee) {
-          const remainingNeed = adjustedFee - totalPaid;
+        while (paymentIndex < paymentPool.length) {
           const available = paymentPool[paymentIndex];
 
-          if (available <= remainingNeed) {
-            totalPaid += available;
-            paymentIndex++;
+          if (totalPaid < requiredFee) {
+            const remainingNeed = requiredFee - totalPaid;
+
+            if (available <= remainingNeed) {
+              totalPaid += available;
+              paymentIndex++;
+            } else {
+              totalPaid += remainingNeed;
+              carryOver += (available - remainingNeed); // ortiqcha qism carryOver ga qo‘shiladi
+              paymentIndex++;
+            }
           } else {
-            totalPaid += remainingNeed;
-            paymentPool[paymentIndex] -= remainingNeed;
+            // Agar requiredFee allaqachon yopilgan bo‘lsa, butun summani carryOver ga qo‘shamiz
+            carryOver += available;
+            paymentIndex++;
           }
         }
 
         totalPaidAll += totalPaid;
 
-        let remainingAmount = Math.max(adjustedFee - totalPaid, 0);
-        let carryOverUsed = Math.min(carryOver, remainingAmount);
-        remainingAmount -= carryOverUsed;
-        carryOver -= carryOverUsed;
-        carryOverTotalUsed += carryOverUsed;
+        // Qarzdorlik hisoblash
+        let remainingAmount = Math.max(requiredFee - totalPaid, 0);
 
+        // Hozirgi oydagi haqdorlik (ortiqcha qism)
         const overpaidAmount = Math.max(
           totalPaid + carryOverUsed - adjustedFee,
           0
         );
-        carryOver += overpaidAmount;
 
         months.push({
           month: current.toLocaleString("uz-UZ", {
@@ -369,7 +383,12 @@ export const getStudentById = async (req, res) => {
           totalPaid,
           remainingAmount,
           overpaidAmount,
-          message: remainingAmount === 0 ? "To'langan" : "Qarzdor",
+          message:
+            remainingAmount === 0
+              ? overpaidAmount > 0
+                ? "Haqdor"
+                : "To'langan"
+              : "Qarzdor",
         });
 
         current.setMonth(current.getMonth() + 1);
