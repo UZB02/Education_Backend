@@ -14,16 +14,22 @@ export const getOrCreateBalance = async (userId) => {
   return balance;
 };
 
-export const updateBalanceAmount = async (userId) => {
+export const updateBalanceAmount = async (userId, filters = {}) => {
   if (!userId) throw new Error("userId kerak");
 
+  const { paymentFilter = {}, expenseFilter = {} } = filters;
+
   const payments = await Payment.aggregate([
-    { $match: { userId: new mongoose.Types.ObjectId(userId) } },
+    {
+      $match: { userId: new mongoose.Types.ObjectId(userId), ...paymentFilter },
+    },
     { $group: { _id: null, total: { $sum: "$amount" } } },
   ]);
 
   const expenses = await Expense.aggregate([
-    { $match: { userId: new mongoose.Types.ObjectId(userId) } },
+    {
+      $match: { userId: new mongoose.Types.ObjectId(userId), ...expenseFilter },
+    },
     { $group: { _id: null, total: { $sum: "$amount" } } },
   ]);
 
