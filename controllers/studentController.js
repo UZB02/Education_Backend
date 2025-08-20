@@ -100,7 +100,17 @@ export const getAllStudents = async (req, res) => {
 // Yangi student qo‘shish
 export const addStudent = async (req, res) => {
   try {
-    const { name, lastname, phone, location, groupId, description, admin, applicationId } = req.body;
+    const {
+      name,
+      lastname,
+      phone,
+      location,
+      groupId,
+      description,
+      admin,
+      applicationId,
+      parentPhone,
+    } = req.body;
 
     if (!name || !lastname || !groupId || !admin) {
       return res.status(400).json({ message: "Majburiy maydonlar to‘ldirilmagan" });
@@ -114,6 +124,7 @@ export const addStudent = async (req, res) => {
       groupId,
       description,
       admin,
+      parentPhone,
       // applicationId,
     });
 
@@ -160,6 +171,7 @@ export const updateStudent = async (req, res) => {
       groupId,
       description,
       admin,
+      parentPhone,
     } = req.body;
 
     const updatedStudent = await Student.findByIdAndUpdate(
@@ -172,6 +184,7 @@ export const updateStudent = async (req, res) => {
         groupId,
         description,
         admin,
+        parentPhone,
       },
       { new: true } // yangilangan versiyani qaytaradi
     );

@@ -16,6 +16,10 @@ import salaryRoutes from "./routes/salaryRoutes.js";
 import teacherAuthRoutes from "./routes/teacherAuthRoutes.js";
 import attendanceRoutes from "./routes/attendanceRoutes.js";
 import debttRoutes from "./routes/debtRoutes.js"
+import parentRoutes from "./routes/parentRoutes.js";
+
+// Admin / Super Admin routes
+import adminAuthRoutes from "./routes/adminAuthRoutes.js";
 
 dotenv.config();
 
@@ -23,9 +27,13 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Admin / Super Admin routes
+app.use("/api/admin-auth", adminAuthRoutes);
+app.use("/api/auth", authRoutes);
+// boshqa route’lar bilan birga qo‘shasiz
+app.use("/api/parents", parentRoutes);
 // Routes
 app.use("/api/columns", columnRoutes);
-app.use("/api/auth", authRoutes);
 app.use("/api/applications", applicationRoutes);
 app.use("/api/groups", groupRouters);
 app.use("/api/teachers", teacherRoutes);
