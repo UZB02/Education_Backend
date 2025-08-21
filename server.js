@@ -17,6 +17,7 @@ import teacherAuthRoutes from "./routes/teacherAuthRoutes.js";
 import attendanceRoutes from "./routes/attendanceRoutes.js";
 import debttRoutes from "./routes/debtRoutes.js"
 import parentRoutes from "./routes/parentRoutes.js";
+import progressRoutes from "./routes/progressRoutes.js";
 
 // Admin / Super Admin routes
 import adminAuthRoutes from "./routes/adminAuthRoutes.js";
@@ -26,6 +27,7 @@ dotenv.config();
 const app = express();
 app.use(cors());
 app.use(express.json());
+
 
 // Admin / Super Admin routes
 app.use("/api/admin-auth", adminAuthRoutes);
@@ -46,6 +48,7 @@ app.use("/api/salaries", salaryRoutes);
 app.use("/api/teacher-auth", teacherAuthRoutes);
 app.use("/api/attendance", attendanceRoutes);
 app.use("/api/debtors",debttRoutes)
+app.use("/api/progress", progressRoutes);
 // Connect to DB
 mongoose
   .connect(process.env.MONGO_URI)
