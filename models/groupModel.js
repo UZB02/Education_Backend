@@ -26,7 +26,6 @@ const groupSchema = new mongoose.Schema(
       required: true,
       min: 0,
     },
-
     // 📌 yangi maydonlar
     scheduleType: {
       type: String,
