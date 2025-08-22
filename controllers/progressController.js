@@ -5,14 +5,13 @@ import Attendance from "../models/attendanceModel.js";
 // ------------------ Helper: Progress darajasini hisoblash ------------------
 
 
-// Helper: Level hisoblash
+// Helper: Level hisoblashconst calculateLevel = (attendanceScore, teacherFeedback) => {
 const calculateLevel = (attendanceScore, teacherFeedback) => {
   const score = attendanceScore * 0.5 + teacherFeedback * 0.5;
   if (score >= 80) return "Yuqori";
   if (score >= 60) return "O‘rta";
   return "Past";
 };
-
 // ------------------ GROUP STATISTICS ------------------
 export const getGroupProgressStats = async (req, res) => {
   try {
@@ -28,12 +27,11 @@ export const getGroupProgressStats = async (req, res) => {
 
     const stats = [];
 
-    // Har bir o‘quvchi uchun hisoblash
+    const currentYear = year ? parseInt(year) : new Date().getFullYear();
+    const currentMonth = month ? parseInt(month) - 1 : new Date().getMonth();
+
     for (const student of students) {
       let start, end;
-
-      const currentYear = year ? parseInt(year) : new Date().getFullYear();
-      const currentMonth = month ? parseInt(month) - 1 : new Date().getMonth();
 
       if (type === "weekly") {
         const now = new Date();
@@ -57,26 +55,33 @@ export const getGroupProgressStats = async (req, res) => {
         date: { $gte: start, $lte: end },
       });
 
+      // Shu davrdagi progresslar
+      const progresses = await Progress.find({
+        studentId: student._id,
+        date: { $gte: start, $lte: end },
+      });
+
+      // Attendance score
       let totalAttendance = 0;
       attendances.forEach((a) => {
         if (a.status === "present") totalAttendance += 5;
         else if (a.status === "late") totalAttendance += 2;
       });
 
-      // Agar teacherFeedback alohida jadvalda bo‘lsa shu yerda olish mumkin
-      const teacherFeedback = attendances.reduce(
-        (sum, a) => sum + (a.teacherFeedback || 0),
-        0
-      );
+      // Teacher feedback jamlash
+      let totalTeacherFeedback = 0;
+      progresses.forEach((p) => {
+        totalTeacherFeedback += p.teacherFeedback || 0;
+      });
 
-      const totalScore = totalAttendance + teacherFeedback;
-      const overallLevel = calculateLevel(totalAttendance, teacherFeedback);
+      const totalScore = totalAttendance + totalTeacherFeedback;
+      const overallLevel = calculateLevel(totalAttendance, totalTeacherFeedback);
 
       stats.push({
         studentId: student._id,
         studentName: student.name + " " + student.lastname,
         attendanceScore: totalAttendance,
-        teacherFeedback,
+        teacherFeedback: totalTeacherFeedback,
         totalScore,
         overallLevel,
       });
@@ -88,12 +93,10 @@ export const getGroupProgressStats = async (req, res) => {
     res.status(200).json(stats);
   } catch (err) {
     console.error(err);
-    res
-      .status(500)
-      .json({
-        message: "Guruh statistikasi olishda xatolik",
-        error: err.message,
-      });
+    res.status(500).json({
+      message: "Guruh statistikasi olishda xatolik",
+      error: err.message,
+    });
   }
 };
 
