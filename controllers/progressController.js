@@ -100,16 +100,27 @@ export const getGroupProgressStats = async (req, res) => {
 // ------------------ CREATE PROGRESS ------------------
 export const createProgress = async (req, res) => {
   try {
-    const { studentId, teacherFeedback, date } = req.body;
+    const { studentId, teacherFeedback, description } = req.body;
+    let { date } = req.body;
 
+    // Agar date kelmagan bo‘lsa, bugungi sanani olish
+    if (!date) {
+      const today = new Date();
+      date = today.toISOString().split("T")[0]; // masalan: "2025-08-22"
+    }
+
+    // Studentni topish
     const student = await Student.findById(studentId).populate("groupId");
-    if (!student) return res.status(404).json({ message: "Student topilmadi" });
+    if (!student) {
+      return res.status(404).json({ message: "Student topilmadi" });
+    }
 
     const subject = student.groupId?.name;
-    if (!subject)
+    if (!subject) {
       return res
         .status(400)
         .json({ message: "Student guruhga biriktirilmagan" });
+    }
 
     // Attendance hisoblash
     const start = new Date(date);
@@ -128,24 +139,30 @@ export const createProgress = async (req, res) => {
       return sum; // absent = 0
     }, 0);
 
+    // Umumiy darajani hisoblash
     const overallLevel = calculateLevel(attendanceScore, teacherFeedback);
 
+    // Yangi progress yaratish
     const progress = await Progress.create({
       studentId,
       subject,
       attendanceRate: attendanceScore,
       teacherFeedback,
+      description, // 🆕 qo‘shildi
       overallLevel,
-      date: date || new Date(),
+      date: new Date(date), // har doim Date object bo‘lishi uchun
     });
 
     res.status(201).json(progress);
   } catch (err) {
-    res
-      .status(500)
-      .json({ message: "Progress yaratishda xatolik", error: err.message });
+    res.status(500).json({
+      message: "Progress yaratishda xatolik",
+      error: err.message,
+    });
   }
 };
+
+
 
 // ------------------ GET ALL PROGRESS ------------------
 export const getAllProgress = async (req, res) => {
@@ -162,15 +179,50 @@ export const getAllProgress = async (req, res) => {
   }
 };
 
-// ------------------ GET STUDENT PROGRESS ------------------
+// ------------------ GET STUDENT PROGRESS (kunlik) ------------------
 export const getStudentProgress = async (req, res) => {
   try {
     const { id } = req.params;
-    const progress = await Progress.find({ studentId: id })
+
+    // progresslar (oxirgi yozuvdan boshlab)
+    let progresses = await Progress.find({ studentId: id })
       .populate("studentId", "name lastname")
       .sort({ date: -1 });
 
-    res.status(200).json(progress);
+    progresses = await Promise.all(
+      progresses.map(async (p) => {
+        const start = new Date(p.date);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(p.date);
+        end.setHours(23, 59, 59, 999);
+
+        // Shu kunda barcha attendance yozuvlarini olish
+        const attendances = await Attendance.find({
+          studentId: id,
+          date: { $gte: start, $lte: end },
+        });
+
+        // Attendance score jamlab hisoblash
+        const attendanceScore = attendances.reduce((sum, att) => {
+          if (att.status === "present") return sum + 5;
+          if (att.status === "late") return sum + 2;
+          return sum; // absent = 0
+        }, 0);
+
+        // Teacher feedback bo'lmasa 0 qabul qilamiz
+        const feedbackScore = p.teacherFeedback || 0;
+
+        const overallLevel = calculateLevel(attendanceScore, feedbackScore);
+
+        return {
+          ...p.toObject(),
+          attendanceRate: attendanceScore,
+          overallLevel,
+        };
+      })
+    );
+
+    res.status(200).json(progresses);
   } catch (err) {
     res.status(500).json({
       message: "O‘quvchi progressini olishda xatolik",
@@ -178,6 +230,8 @@ export const getStudentProgress = async (req, res) => {
     });
   }
 };
+
+
 
 // ------------------ GET STUDENT MONTHLY PROGRESS ------------------
 export const getStudentMonthlyProgress = async (req, res) => {
@@ -234,19 +288,22 @@ export const getStudentMonthlyProgress = async (req, res) => {
 export const updateProgress = async (req, res) => {
   try {
     const { id } = req.params;
-    const { teacherFeedback } = req.body;
+    const { teacherFeedback, description } = req.body; // 🆕 description qo‘shildi
 
     const progress = await Progress.findById(id);
-    if (!progress)
+    if (!progress) {
       return res.status(404).json({ message: "Progress topilmadi" });
+    }
 
     // AttendanceRateni Attendance collectiondan olish
+    const start = new Date(progress.date);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(progress.date);
+    end.setHours(23, 59, 59, 999);
+
     const attendances = await Attendance.find({
       studentId: progress.studentId,
-      date: {
-        $gte: new Date(progress.date.setHours(0, 0, 0, 0)),
-        $lte: new Date(progress.date.setHours(23, 59, 59, 999)),
-      },
+      date: { $gte: start, $lte: end },
     });
 
     const attendanceScore = attendances.reduce((sum, att) => {
@@ -255,19 +312,23 @@ export const updateProgress = async (req, res) => {
       return sum; // absent = 0
     }, 0);
 
+    // Umumiy level qayta hisoblash
     const overallLevel = calculateLevel(attendanceScore, teacherFeedback);
 
+    // Ma’lumotlarni yangilash
     progress.attendanceRate = attendanceScore;
     progress.teacherFeedback = teacherFeedback;
+    progress.description = description || progress.description; // 🆕 yangilash
     progress.overallLevel = overallLevel;
 
     await progress.save();
 
     res.status(200).json(progress);
   } catch (err) {
-    res
-      .status(500)
-      .json({ message: "Progress yangilashda xatolik", error: err.message });
+    res.status(500).json({
+      message: "Progress yangilashda xatolik",
+      error: err.message,
+    });
   }
 };
 
@@ -284,7 +345,7 @@ export const deleteProgress = async (req, res) => {
   }
 };
 
-// ------------------ GET STUDENT YEARLY PROGRESS ------------------
+// ------------------ GET STUDENT YEARLY PROGRESS (oylik) ------------------
 export const getStudentYearlyProgress = async (req, res) => {
   try {
     const { id } = req.params;
@@ -292,51 +353,65 @@ export const getStudentYearlyProgress = async (req, res) => {
 
     if (!year) return res.status(400).json({ message: "Yil kerak" });
 
-    const monthlyData = Array(12)
-      .fill(null)
-      .map((_, i) => ({
-        month: i + 1,
-        attendanceScore: 0,
-        teacherFeedback: 0,
-      }));
+    const monthlyData = Array.from({ length: 12 }, (_, i) => ({
+      month: i + 1,
+      days: [], // kunlik tafsilotlar
+      attendanceScore: 0,
+      teacherFeedback: 0,
+    }));
 
     for (let i = 0; i < 12; i++) {
       const start = new Date(year, i, 1);
       const end = new Date(year, i + 1, 0, 23, 59, 59);
 
+      // Shu oy uchun barcha attendance yozuvlari
       const attendances = await Attendance.find({
         studentId: id,
         date: { $gte: start, $lte: end },
       });
 
-      const attendanceScore = attendances.reduce((sum, att) => {
-        if (att.status === "present") return sum + 5;
-        if (att.status === "late") return sum + 2;
-        return sum;
-      }, 0);
+      // Har bir attendance score hisoblanadi
+      const dailyData = attendances.map((att) => {
+        let score = 0;
+        if (att.status === "present") score = 5;
+        else if (att.status === "late") score = 2;
+        return {
+          date: att.date,
+          status: att.status,
+          score,
+        };
+      });
 
+      // Oy bo‘yicha jami attendance balli
+      const attendanceScore = dailyData.reduce((sum, d) => sum + d.score, 0);
+
+      // Shu oy progresslari
       const progresses = await Progress.find({
         studentId: id,
         date: { $gte: start, $lte: end },
       });
 
       const totalFeedback =
-        progresses.reduce((sum, p) => sum + p.teacherFeedback, 0) || 0;
+        progresses.reduce((sum, p) => sum + (p.teacherFeedback || 0), 0);
 
+      monthlyData[i].days = dailyData; 
       monthlyData[i].attendanceScore = attendanceScore;
       monthlyData[i].teacherFeedback = totalFeedback;
     }
 
+    // Natija
     const result = monthlyData.map((m) => ({
       month: m.month,
       totalAttendance: m.attendanceScore,
       totalFeedback: m.teacherFeedback,
+      details: m.days, // kunlik tafsilotlar
     }));
 
     res.status(200).json(result);
   } catch (err) {
-    res
-      .status(500)
-      .json({ message: "Yillik progress olishda xatolik", error: err.message });
+    res.status(500).json({
+      message: "Yillik progress olishda xatolik",
+      error: err.message,
+    });
   }
 };

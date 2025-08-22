@@ -15,14 +15,13 @@ const progressSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
-    averageScore: {
-      type: Number,
-      default: 0,
+    description: {
+      type: String,
+      trim: true,
+      default: "", // agar yuborilmasa bo‘sh bo‘ladi
     },
     teacherFeedback: {
       type: Number,
-      min: 1,
-      max: 5,
       default: 0,
     },
     overallLevel: {
@@ -32,7 +31,7 @@ const progressSchema = new mongoose.Schema(
     },
     date: {
       type: Date,
-      default: Date.now, // 🆕 qo‘shildi
+      default: Date.now, // avtomatik bugungi sana
     },
   },
   { timestamps: true }
