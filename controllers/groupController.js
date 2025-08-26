@@ -73,7 +73,29 @@ export const getGroupById = async (req, res) => {
   }
 };
 
-// POST: create group with adminId (from body)
+// 12h yoki 24h formatdagi vaqtni 24h formatga o‘girish funksiyasi
+const to24HourFormat = (time) => {
+  if (!time) return null;
+
+  // Agar time allaqachon 24h formatda bo'lsa (HH:mm)
+  const match24 = time.match(/^([01]?\d|2[0-3]):([0-5]\d)$/);
+  if (match24) return time;
+
+  // 12h format (hh:mm AM/PM)
+  const match12 = time.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (!match12) return null;
+
+  let hours = parseInt(match12[1], 10);
+  const minutes = match12[2];
+  const period = match12[3].toUpperCase();
+
+  if (period === "PM" && hours < 12) hours += 12;
+  if (period === "AM" && hours === 12) hours = 0;
+
+  return `${hours.toString().padStart(2, "0")}:${minutes}`;
+};
+
+// POST: create group with adminId
 export const createGroup = async (req, res) => {
   try {
     const {
@@ -92,23 +114,26 @@ export const createGroup = async (req, res) => {
       return res.status(400).json({ message: "adminId is required" });
     }
 
-    if (!startTime || !endTime) {
-      return res.status(400).json({ message: "startTime va endTime majburiy" });
+    // 24 soatlik formatga o‘girish
+    const finalStartTime = to24HourFormat(startTime);
+    const finalEndTime = to24HourFormat(endTime);
+
+    if (!finalStartTime || !finalEndTime) {
+      return res
+        .status(400)
+        .json({ message: "startTime va endTime noto‘g‘ri formatda" });
     }
 
     // Agar custom bo‘lsa -> days kerak
-    if (scheduleType === "custom" && (!days || days.length === 0)) {
-      return res
-        .status(400)
-        .json({ message: "Custom schedule requires days array" });
-    }
-
-    // Agar toq/juft bo‘lsa -> avtomatik belgilaymiz
     let finalDays = days;
     if (scheduleType === "toq") {
       finalDays = ["Dushanba", "Chorshanba", "Juma"];
     } else if (scheduleType === "juft") {
       finalDays = ["Seshanba", "Payshanba", "Shanba"];
+    } else if (scheduleType === "custom" && (!days || days.length === 0)) {
+      return res
+        .status(400)
+        .json({ message: "Custom schedule requires days array" });
     }
 
     const newGroup = new Group({
@@ -119,8 +144,8 @@ export const createGroup = async (req, res) => {
       admin: adminId,
       scheduleType,
       days: finalDays,
-      startTime,
-      endTime,
+      startTime: finalStartTime,
+      endTime: finalEndTime,
       createdAtCustom: new Date(),
       updatedAtCustom: new Date(),
     });
@@ -152,8 +177,14 @@ export const updateGroup = async (req, res) => {
       return res.status(400).json({ message: "adminId is required" });
     }
 
-    if (!startTime || !endTime) {
-      return res.status(400).json({ message: "startTime va endTime majburiy" });
+    // 24 soatlik formatga o‘girish
+    const finalStartTime = to24HourFormat(startTime);
+    const finalEndTime = to24HourFormat(endTime);
+
+    if (!finalStartTime || !finalEndTime) {
+      return res
+        .status(400)
+        .json({ message: "startTime va endTime noto‘g‘ri formatda" });
     }
 
     // scheduleType asosida finalDays
@@ -177,8 +208,8 @@ export const updateGroup = async (req, res) => {
         teacher,
         scheduleType,
         days: finalDays,
-        startTime,
-        endTime,
+        startTime: finalStartTime,
+        endTime: finalEndTime,
         updatedAtCustom: new Date(),
       },
       { new: true }
@@ -195,6 +226,7 @@ export const updateGroup = async (req, res) => {
     res.status(400).json({ message: "Error updating group", error });
   }
 };
+
 
 // DELETE: delete group only if adminId matches
 export const deleteGroup = async (req, res) => {
