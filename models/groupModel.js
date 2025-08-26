@@ -26,12 +26,15 @@ const groupSchema = new mongoose.Schema(
       required: true,
       min: 0,
     },
+
     // 📌 yangi maydonlar
     scheduleType: {
       type: String,
       enum: ["toq", "juft", "custom"],
       default: "custom",
     },
+
+    // Guruh dars kunlari
     days: [
       {
         type: String,
@@ -46,6 +49,16 @@ const groupSchema = new mongoose.Schema(
         ],
       },
     ],
+
+    // 📌 Guruh dars vaqti
+    startTime: {
+      type: String, // masalan: "14:00"
+      required: true,
+    },
+    endTime: {
+      type: String, // masalan: "16:00"
+      required: true,
+    },
 
     createdAtCustom: {
       type: Date,

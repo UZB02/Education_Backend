@@ -13,7 +13,7 @@ export const getAllGroups = async (req, res) => {
     // 1. Barcha guruhlarni olamiz
     const groups = await Group.find({ admin: adminId }).populate("teacher");
 
-    // 2. Har bir guruh uchun groupId asosida studentlarni qo‘shamiz
+    // 2. Har bir guruh uchun studentlarni qo‘shamiz
     const groupsWithStudents = await Promise.all(
       groups.map(async (group) => {
         const students = await Student.find({ groupId: group._id });
@@ -73,8 +73,6 @@ export const getGroupById = async (req, res) => {
   }
 };
 
-
-
 // POST: create group with adminId (from body)
 export const createGroup = async (req, res) => {
   try {
@@ -86,10 +84,16 @@ export const createGroup = async (req, res) => {
       adminId,
       scheduleType,
       days,
+      startTime,
+      endTime,
     } = req.body;
 
     if (!adminId) {
       return res.status(400).json({ message: "adminId is required" });
+    }
+
+    if (!startTime || !endTime) {
+      return res.status(400).json({ message: "startTime va endTime majburiy" });
     }
 
     // Agar custom bo‘lsa -> days kerak
@@ -115,6 +119,8 @@ export const createGroup = async (req, res) => {
       admin: adminId,
       scheduleType,
       days: finalDays,
+      startTime,
+      endTime,
       createdAtCustom: new Date(),
       updatedAtCustom: new Date(),
     });
@@ -137,11 +143,17 @@ export const updateGroup = async (req, res) => {
       adminId,
       scheduleType,
       days,
+      startTime,
+      endTime,
     } = req.body;
     const { id } = req.params;
 
     if (!adminId) {
       return res.status(400).json({ message: "adminId is required" });
+    }
+
+    if (!startTime || !endTime) {
+      return res.status(400).json({ message: "startTime va endTime majburiy" });
     }
 
     // scheduleType asosida finalDays
@@ -165,6 +177,8 @@ export const updateGroup = async (req, res) => {
         teacher,
         scheduleType,
         days: finalDays,
+        startTime,
+        endTime,
         updatedAtCustom: new Date(),
       },
       { new: true }

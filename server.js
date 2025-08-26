@@ -18,6 +18,10 @@ import attendanceRoutes from "./routes/attendanceRoutes.js";
 import debttRoutes from "./routes/debtRoutes.js"
 import parentRoutes from "./routes/parentRoutes.js";
 import progressRoutes from "./routes/progressRoutes.js";
+import roomScheduleRoutes from "./routes/roomScheduleRoutes.js";
+import roomRoutes from "./routes/roomRoutes.js"
+
+
 
 // Admin / Super Admin routes
 import adminAuthRoutes from "./routes/adminAuthRoutes.js";
@@ -49,6 +53,8 @@ app.use("/api/teacher-auth", teacherAuthRoutes);
 app.use("/api/attendance", attendanceRoutes);
 app.use("/api/debtors",debttRoutes)
 app.use("/api/progress", progressRoutes);
+app.use("/api/rooms", roomRoutes);
+app.use("/api/room-schedules", roomScheduleRoutes);
 // Connect to DB
 mongoose
   .connect(process.env.MONGO_URI)
