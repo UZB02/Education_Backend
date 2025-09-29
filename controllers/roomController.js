@@ -19,7 +19,7 @@ export const createRoom = async (req, res) => {
     res.status(201).json({ message: "✅ Room created successfully", room });
   } catch (error) {
     res.status(500).json({
-      message: "❌ Failed to create room",
+      message: "❌ Xona qo'shishda xatolik. Bunday nomdagi xona oldin kiritilgan bo'lishi mumkin!",
       error: error.message,
     });
   }
@@ -101,16 +101,23 @@ export const updateRoom = async (req, res) => {
   }
 };
 
+
 // ---------------- DELETE ROOM ----------------
 export const deleteRoom = async (req, res) => {
   try {
+    // Roomni o'chirish
     const room = await Room.findByIdAndDelete(req.params.id);
 
     if (!room) {
       return res.status(404).json({ message: "❌ Room not found" });
     }
 
-    res.status(200).json({ message: "✅ Room deleted successfully" });
+    // Shu roomga bog'langan RoomSchedule larni o'chirish
+    await RoomSchedule.deleteMany({ roomId: room._id });
+
+    res
+      .status(200)
+      .json({ message: "✅ Room and its schedules deleted successfully" });
   } catch (error) {
     res.status(500).json({
       message: "❌ Failed to delete room",
@@ -118,6 +125,7 @@ export const deleteRoom = async (req, res) => {
     });
   }
 };
+
 
 // ---------------- ASSIGN SCHEDULE TO ROOM ----------------
 export const assignSchedule = async (req, res) => {
