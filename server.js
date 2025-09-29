@@ -64,3 +64,14 @@ mongoose
     )
   )
   .catch((err) => console.log(err));
+
+  // === Auto-ping (Render Free tarifida uxlab qolmasligi uchun) ===
+if (process.env.RENDER_EXTERNAL_URL) {
+  setInterval(() => {
+    fetch(process.env.RENDER_EXTERNAL_URL + "/")
+      .then(() =>
+        console.log("🔄 Auto-ping yuborildi:", new Date().toLocaleString())
+      )
+      .catch((err) => console.error("❌ Auto-ping xato:", err));
+  }, 10 * 60 * 1000); // 10 daqiqada bir ping
+}
