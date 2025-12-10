@@ -19,6 +19,7 @@ export const teacherAuth = async (req, res, next) => {
       return res.status(404).json({ message: "O‘qituvchi topilmadi" });
     }
 
+    // 🔹 Muhim: controller-da req.user._id ishlaydi
     req.user = teacher;
     next();
   } catch (error) {

@@ -20,11 +20,11 @@ import parentRoutes from "./routes/parentRoutes.js";
 import progressRoutes from "./routes/progressRoutes.js";
 import roomScheduleRoutes from "./routes/roomScheduleRoutes.js";
 import roomRoutes from "./routes/roomRoutes.js"
+import subjectRoutes from "./routes/SubjectRoutes.js";
+import testsRoutes from "./routes/TestRoutes.js"
 
 
 
-// Admin / Super Admin routes
-import adminAuthRoutes from "./routes/adminAuthRoutes.js";
 
 dotenv.config();
 
@@ -34,7 +34,6 @@ app.use(express.json());
 
 
 // Admin / Super Admin routes
-app.use("/api/admin-auth", adminAuthRoutes);
 app.use("/api/auth", authRoutes);
 // boshqa route’lar bilan birga qo‘shasiz
 app.use("/api/parents", parentRoutes);
@@ -54,6 +53,8 @@ app.use("/api/attendance", attendanceRoutes);
 app.use("/api/debtors",debttRoutes)
 app.use("/api/progress", progressRoutes);
 app.use("/api/rooms", roomRoutes);
+app.use("/api/subjects", subjectRoutes);
+app.use("/api/tests", testsRoutes);
 app.use("/api/room-schedules", roomScheduleRoutes);
 // Connect to DB
 mongoose
