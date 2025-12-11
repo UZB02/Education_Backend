@@ -10,12 +10,17 @@ const studentSchema = new mongoose.Schema({
     required: true,
   },
   phone: {
-    type: String, // o‘quvchining o‘z telefoni
+    type: String,
     default: null,
   },
   parentPhone: {
-    type: String, // ota-ona telefoni (ota-ona portali uchun asosiy)
+    type: String,
     required: true,
+  },
+  password: {
+    // 🔑 Ota-ona platformasi uchun parol
+    type: String,
+    required: false, // keyinchalik avtomatik generate qilinadi
   },
   location: {
     type: String,
@@ -31,7 +36,7 @@ const studentSchema = new mongoose.Schema({
   },
   admin: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "User", // admin kim tomonidan qo‘shilgan
+    ref: "User",
     required: true,
   },
   applicationId: {
@@ -39,7 +44,6 @@ const studentSchema = new mongoose.Schema({
     ref: "Application",
   },
   chatId: {
-    // ✅ Telegram chat ID
     type: Number,
     default: null,
   },

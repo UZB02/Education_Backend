@@ -2,36 +2,51 @@ import jwt from "jsonwebtoken";
 import Student from "../models/studentModel.js";
 import Payment from "../models/PaymentModel.js";
 import Attendance from "../models/attendanceModel.js";
+import bcrypt from "bcrypt";
 
-// 1️⃣ Ota-ona login (telefon raqami orqali farzandlarni topish)
+// 1️⃣ Ota-ona login (telefon raqami + parol)
 export const parentLogin = async (req, res) => {
   try {
-    const { phone } = req.body;
+    const { parentPhone, password } = req.body;
 
-    if (!phone) {
-      return res.status(400).json({ message: "Telefon raqam kiritilmadi" });
+    if (!parentPhone || !password) {
+      return res
+        .status(400)
+        .json({ message: "Telefon raqam va parol kiritilmadi" });
     }
 
-    const students = await Student.find({ parentPhone: phone }).populate(
-      "groupId"
-    );
+    // parentPhone bo‘yicha farzandlarni topamiz
+    const student = await Student.findOne({ parentPhone });
 
-    if (!students || students.length === 0) {
+    if (!student) {
       return res.status(404).json({ message: "Bu raqamga farzand topilmadi" });
     }
 
-    // 🔑 JWT token (portalga kirishda saqlab olish uchun)
-    const token = jwt.sign({ phone, role: "parent" }, process.env.JWT_SECRET, {
-      expiresIn: "7d",
-    });
+    // Password tekshirish
+    const match = await bcrypt.compare(password, student.password);
+    if (!match) {
+      return res.status(401).json({ message: "Noto‘g‘ri parol" });
+    }
+
+    // JWT token yaratish
+    const token = jwt.sign(
+      { parentPhone, role: "parent" },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    // Shu ota-onaga tegishli barcha farzandlar
+    const students = await Student.find({ parentPhone }).populate("groupId");
 
     res.json({
+      message: "Tizimga muvaffaqiyatli kirdingiz",
       token,
-      parentPhone: phone,
+      parentPhone,
       students,
     });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error(err);
+    res.status(500).json({ message: "Server xatosi" });
   }
 };
 
@@ -40,9 +55,9 @@ export const getStudentPayments = async (req, res) => {
   try {
     const studentId = req.params.id;
 
-    const payments = await Payment.find({ studentId }) // ✅ to‘g‘rilandi
+    const payments = await Payment.find({ studentId })
       .sort({ paidAt: -1 })
-      .populate("studentId", "name lastname"); // ✅ to‘g‘ri field nomi
+      .populate("studentId", "name lastname");
 
     res.json(payments);
   } catch (err) {
@@ -50,15 +65,14 @@ export const getStudentPayments = async (req, res) => {
   }
 };
 
-
 // 3️⃣ Farzandning davomatlari
 export const getStudentAttendance = async (req, res) => {
   try {
     const studentId = req.params.id;
 
-    const attendance = await Attendance.find({ studentId }) // ✅ to‘g‘rilandi
+    const attendance = await Attendance.find({ studentId })
       .sort({ date: -1 })
-      .populate("studentId", "name lastname") // ✅ to‘g‘ri nom
+      .populate("studentId", "name lastname")
       .populate("groupId", "name");
 
     res.json(attendance);
@@ -67,7 +81,7 @@ export const getStudentAttendance = async (req, res) => {
   }
 };
 
-// 4️⃣ Ota-onaning barcha farzandlari (guruh va o‘qituvchi bilan)
+// 4️⃣ Ota-onaning barcha farzandlari
 export const getChildren = async (req, res) => {
   try {
     const phone = req.parent?.phone;
@@ -79,9 +93,9 @@ export const getChildren = async (req, res) => {
     const students = await Student.find({ parentPhone: phone })
       .populate({
         path: "groupId",
-        select: "name scheduleType days monthlyFee teacher", // ✅ teacher
+        select: "name scheduleType days monthlyFee teacher",
         populate: {
-          path: "teacher", // ✅ to‘g‘ri field nomi
+          path: "teacher",
           select: "name lastname science phone",
         },
       })
@@ -91,7 +105,6 @@ export const getChildren = async (req, res) => {
       return res.status(404).json({ message: "Farzandlar topilmadi" });
     }
 
-    // 🔄 Obyektni formatlash
     const response = students.map((student) => ({
       id: student._id,
       name: student.name,
@@ -117,79 +130,6 @@ export const getChildren = async (req, res) => {
     }));
 
     res.json(response);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
-
-export const getChildGroups = async (req, res) => {
-  try {
-    const studentId = req.params.id;
-
-    // 1️⃣ O‘quvchini topamiz
-    const student = await Student.findById(studentId);
-    if (!student) {
-      return res.status(404).json({ message: "O‘quvchi topilmadi" });
-    }
-
-    // 2️⃣ Shu bola bilan bir xil ism/familiya va parentPhone bo‘yicha hamma hujjatlarni topamiz
-    const siblings = await Student.find({
-      name: student.name,
-      lastname: student.lastname,
-      parentPhone: student.parentPhone,
-    }).populate({
-      path: "groupId",
-      populate: {
-        path: "teacher",
-        select: "name lastname science phone",
-      },
-    });
-
-    // 3️⃣ Hamma guruhlarni yig‘ib chiqamiz
-    let groups = siblings.map((s) => s.groupId).filter((g) => g); // null bo‘lsa tashlaymiz
-
-    // 4️⃣ Unikal qilish (group._id bo‘yicha)
-    const uniqueGroups = [];
-    const seen = new Set();
-
-    for (const group of groups) {
-      if (!seen.has(group._id.toString())) {
-        seen.add(group._id.toString());
-        uniqueGroups.push(group);
-      }
-    }
-
-    if (uniqueGroups.length === 0) {
-      return res.json({
-        id: student._id,
-        name: student.name,
-        lastname: student.lastname,
-        groups: [],
-        message: "Farzand hali hech qaysi guruhga biriktirilmagan",
-      });
-    }
-
-    // 5️⃣ Javobni formatlab yuboramiz
-    res.json({
-      id: student._id,
-      name: student.name,
-      lastname: student.lastname,
-      groups: uniqueGroups.map((group) => ({
-        id: group._id,
-        name: group.name,
-        scheduleType: group.scheduleType,
-        days: group.days,
-        monthlyFee: group.monthlyFee,
-        teacher: group.teacher
-          ? {
-              name: group.teacher.name,
-              lastname: group.teacher.lastname,
-              science: group.teacher.science,
-              phone: group.teacher.phone,
-            }
-          : null,
-      })),
-    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

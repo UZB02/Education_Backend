@@ -1,18 +1,21 @@
 import TelegramBot from "node-telegram-bot-api";
 import dotenv from "dotenv";
-import Student from "../models/studentModel.js"; // modelni chaqiramiz
+import Student from "../models/studentModel.js";
 
 dotenv.config();
 
-export const bot = new TelegramBot("8297536841:AAHimnbzl6Ru9u8Gvks0uhvYdX8dGOGKFwU", {
+export const bot = new TelegramBot(process.env.TELEGRAM_TOKEN, {
   polling: true,
 });
-
+// Xabar yuborish funksiyasi
+export const sendMessageToUser = async (chatId, message) => {
+  await bot.sendMessage(chatId, message);
+};
 // /start komandasi
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
 
-  await bot.sendMessage(
+  await sendMessageToUser(
     chatId,
     "Salom! Telefon raqamingizni yuborish uchun tugmani bosing 📱",
     {
@@ -31,18 +34,12 @@ bot.onText(/\/start/, async (msg) => {
 bot.on("contact", async (msg) => {
   let phoneNumber = msg.contact.phone_number;
 
-  // Telefon raqamni +998 formatiga keltirish
-  if (!phoneNumber.startsWith("+")) {
-    phoneNumber = "+" + phoneNumber;
-  }
-
-  // Agar faqat 9 xonali raqam bo'lsa, oldiga +998 qo'shamiz
-  if (phoneNumber.length === 9) {
-    phoneNumber = "+998" + phoneNumber;
-  }
+  if (!phoneNumber.startsWith("+")) phoneNumber = "+" + phoneNumber;
+  if (phoneNumber.length === 9) phoneNumber = "+998" + phoneNumber;
 
   const chatId = msg.chat.id;
 
+  // student.phone orqali qidirish va chatId saqlash
   const student = await Student.findOneAndUpdate(
     { phone: phoneNumber },
     { chatId: chatId },
@@ -50,17 +47,11 @@ bot.on("contact", async (msg) => {
   );
 
   if (student) {
-    bot.sendMessage(
+    await sendMessageToUser(
       chatId,
       `Rahmat ${student.name}! Endi sizga xabar yuborishimiz mumkin ✅`
     );
   } else {
-    bot.sendMessage(chatId, "Telefon raqamingiz bazada topilmadi ❌");
+    await sendMessageToUser(chatId, "Telefon raqamingiz bazada topilmadi ❌");
   }
 });
-
-
-// Xabar yuborish funksiyasi
-export const sendMessageToUser = async (chatId, message) => {
-  await bot.sendMessage(chatId, message);
-};

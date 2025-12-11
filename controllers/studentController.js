@@ -97,6 +97,13 @@ export const getAllStudents = async (req, res) => {
   }
 };
 
+import bcrypt from "bcrypt";
+
+// Tasodifiy 6 xonali parol yaratish
+function generatePassword() {
+  return Math.random().toString().slice(2, 8);
+}
+
 // Yangi student qo‘shish
 export const addStudent = async (req, res) => {
   try {
@@ -112,10 +119,28 @@ export const addStudent = async (req, res) => {
       parentPhone,
     } = req.body;
 
-    if (!name || !lastname || !groupId || !admin) {
-      return res.status(400).json({ message: "Majburiy maydonlar to‘ldirilmagan" });
+    if (!name || !lastname || !groupId || !admin || !parentPhone) {
+      return res.status(400).json({
+        message: "Majburiy maydonlar to‘ldirilmagan",
+      });
     }
 
+    // parentPhone bo‘yicha mavjud farzandlarni tekshirish
+    const existingParent = await Student.findOne({ parentPhone });
+
+    let password;
+    let rawPass = null; // Telegram orqali yuborish uchun
+
+    if (existingParent) {
+      // Agar ota-onaning boshqa farzandi bo‘lsa → mavjud password ishlatiladi
+      password = existingParent.password;
+    } else {
+      // Yangi ota-ona → yangi parol yaratish va hash qilish
+      rawPass = generatePassword();
+      password = await bcrypt.hash(rawPass, 10);
+    }
+
+    // Yangi student yaratish
     const newStudent = await Student.create({
       name,
       lastname,
@@ -124,9 +149,25 @@ export const addStudent = async (req, res) => {
       groupId,
       description,
       admin,
+      applicationId,
       parentPhone,
-      // applicationId,
+      password,
     });
+
+    // Telegram orqali parol yuborish (faqat yangi ota-ona bo‘lsa)
+    if (rawPass) {
+      const parentStudent = await Student.findOne({ parentPhone });
+      if (parentStudent.chatId) {
+        await sendMessageToUser(
+          parentStudent.chatId,
+          `Salom! 👋\nSizning ota-ona portali parolingiz:\n📱 Telefon raqam: ${parentPhone}\n🔑 Parol: ${rawPass}\n\nIltimos, parolingizni hech kimga bermang!`
+        );
+      } else {
+        console.log(
+          `Telegram chatId topilmadi. Parol yuborish uchun ota-ona telefon: ${parentPhone}`
+        );
+      }
+    }
 
     res.status(201).json({
       message: "O‘quvchi muvaffaqiyatli qo‘shildi",
@@ -137,6 +178,7 @@ export const addStudent = async (req, res) => {
     res.status(500).json({ message: "Serverda xatolik yuz berdi", error });
   }
 };
+
 
 // Studentni o‘chirish
 export const deleteStudent = async (req, res) => {
