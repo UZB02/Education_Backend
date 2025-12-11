@@ -97,8 +97,6 @@ export const getAllStudents = async (req, res) => {
   }
 };
 
-import bcrypt from "bcrypt";
-
 // Tasodifiy 6 xonali parol yaratish
 function generatePassword() {
   return Math.random().toString().slice(2, 8);
@@ -135,9 +133,9 @@ export const addStudent = async (req, res) => {
       // Agar ota-onaning boshqa farzandi bo‘lsa → mavjud password ishlatiladi
       password = existingParent.password;
     } else {
-      // Yangi ota-ona → yangi parol yaratish va hash qilish
+      // Yangi ota-ona → yangi parol yaratish (shifrsiz)
       rawPass = generatePassword();
-      password = await bcrypt.hash(rawPass, 10);
+      password = rawPass;
     }
 
     // Yangi student yaratish
@@ -151,7 +149,7 @@ export const addStudent = async (req, res) => {
       admin,
       applicationId,
       parentPhone,
-      password,
+      password, // endi oddiy ko‘rinishda saqlanadi
     });
 
     // Telegram orqali parol yuborish (faqat yangi ota-ona bo‘lsa)
@@ -178,6 +176,7 @@ export const addStudent = async (req, res) => {
     res.status(500).json({ message: "Serverda xatolik yuz berdi", error });
   }
 };
+
 
 
 // Studentni o‘chirish

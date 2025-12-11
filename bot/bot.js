@@ -1,16 +1,19 @@
 import TelegramBot from "node-telegram-bot-api";
 import dotenv from "dotenv";
 import Student from "../models/studentModel.js";
+import bcrypt from "bcrypt";
 
 dotenv.config();
 
 export const bot = new TelegramBot(process.env.TELEGRAM_TOKEN, {
   polling: true,
 });
+
 // Xabar yuborish funksiyasi
-export const sendMessageToUser = async (chatId, message) => {
-  await bot.sendMessage(chatId, message);
+export const sendMessageToUser = async (chatId, message, options = {}) => {
+  await bot.sendMessage(chatId, message, options);
 };
+
 // /start komandasi
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
@@ -39,19 +42,33 @@ bot.on("contact", async (msg) => {
 
   const chatId = msg.chat.id;
 
-  // student.phone orqali qidirish va chatId saqlash
-  const student = await Student.findOneAndUpdate(
-    { phone: phoneNumber },
-    { chatId: chatId },
-    { new: true }
-  );
+  // 1) Avval phone orqali qidiramiz
+  let student = await Student.findOne({ parentPhone: phoneNumber });
 
-  if (student) {
-    await sendMessageToUser(
-      chatId,
-      `Rahmat ${student.name}! Endi sizga xabar yuborishimiz mumkin ✅`
-    );
-  } else {
-    await sendMessageToUser(chatId, "Telefon raqamingiz bazada topilmadi ❌");
+  // 3) Agar umuman topilmasa
+  if (!student) {
+    return sendMessageToUser(chatId, "Telefon raqamingiz bazada topilmadi ❌");
   }
+
+  // 4) chatId yangilash
+  student.chatId = chatId;
+  await student.save();
+
+  // 5) Parolni formatlash (masalan bcrypt shifrdan oddiy formatga qaytmaydi)
+  // Eslatma: bcrypt parolni qayta asl holatiga ochib bo'lmaydi!
+  // Shuning uchun database’da "passwordRaw" bo‘lsa, uni yuborasiz.
+  // Agar yo‘q bo‘lsa, yangi vaqtinchalik parol generatsiya qilish mumkin.
+
+  let realPassword = student.password;
+
+  if (student.passwordRaw) {
+    // Agar sizda alohida raw parol saqlanayotgan bo‘lsa
+    realPassword = student.passwordRaw;
+  }
+
+  await sendMessageToUser(
+    chatId,
+    `Assalomu alaykum, ${student.name}!\nSizning parolingiz: <b>${realPassword}</b>`,
+    { parse_mode: "HTML" }
+  );
 });
