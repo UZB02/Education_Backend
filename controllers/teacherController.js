@@ -3,6 +3,7 @@ import Payment from "../models/PaymentModel.js";
 import Student from "../models/studentModel.js";
 import Group from "../models/groupModel.js";
 import SalaryHistory from "../models/salaryHistoryModel.js";
+import { sendMessageToTeacher } from "../bot/teachersBot.js";
 
 // GET: Faqat kirgan userga tegishli o'qituvchilar + maoshlar tarixi
 export const getAllTeachers = async (req, res) => {
@@ -22,7 +23,6 @@ export const getAllTeachers = async (req, res) => {
     res.status(500).json({ message: "O'qituvchilarni olishda xatolik", error });
   }
 };
-
 
 // GET: Bitta o‘qituvchini olish va unga tegishli maoshlar tarixi bilan + statistikasi
 export const getTeacherById = async (req, res) => {
@@ -98,19 +98,24 @@ export const getTeacherById = async (req, res) => {
   }
 };
 
+function generateRandomPassword() {
+  return Math.random().toString(36).slice(-8);
+}
 
-
-
-// POST: Yangi o'qituvchi qo'shish
 export const createTeacher = async (req, res) => {
   try {
     const { name, lastname, science, userId, phone, percentage } = req.body;
+
     if (!name || !lastname || !science || !userId) {
       return res
         .status(400)
         .json({ message: "Barcha maydonlar to‘ldirilishi shart" });
     }
 
+    // 🔥 1. Random parol yaratamiz
+    const rawPassword = generateRandomPassword();
+
+    // 🔥 2. Teacher yaratamiz (hashlashing shart emas)
     const newTeacher = new Teacher({
       name,
       lastname,
@@ -118,10 +123,17 @@ export const createTeacher = async (req, res) => {
       userId,
       phone,
       percentage,
+      password: rawPassword, // ❗ HASH YO‘Q
     });
+
     await newTeacher.save();
 
-    res.status(201).json(newTeacher);
+    // 🔥 3. Parolni qaytaramiz (botga yuborish uchun)
+    res.status(201).json({
+      message: "O‘qituvchi muvaffaqiyatli yaratildi",
+      teacher: newTeacher,
+      password: rawPassword, // UI yoki botga yuborish uchun
+    });
   } catch (error) {
     res.status(500).json({ message: "O'qituvchini yaratishda xatolik", error });
   }
@@ -152,7 +164,6 @@ export const updateTeacher = async (req, res) => {
     res.status(500).json({ message: "Yangilashda xatolik", error });
   }
 };
-
 
 // DELETE: Faqat o‘zining o‘qituvchisini o‘chirish
 export const deleteTeacher = async (req, res) => {
@@ -220,7 +231,6 @@ export const subtractPointsFromTeacher = async (req, res) => {
   }
 };
 
-
 // 👉 Ichki foydalanish uchun qayta yozilgan versiya
 const calculateTeacherSalaryInternal = async (teacherId) => {
   const teacher = await Teacher.findById(teacherId);
@@ -232,7 +242,9 @@ const calculateTeacherSalaryInternal = async (teacherId) => {
   const groups = await Group.find({ teacher: teacherId }).select("_id");
   const groupIds = groups.map((group) => group._id);
 
-  const students = await Student.find({ groupId: { $in: groupIds } }).select("_id");
+  const students = await Student.find({ groupId: { $in: groupIds } }).select(
+    "_id"
+  );
   const studentIds = students.map((student) => student._id);
 
   const payments = await Payment.find({
@@ -248,7 +260,6 @@ const calculateTeacherSalaryInternal = async (teacherId) => {
 
   return salary;
 };
-
 
 export const getTeacherMonthlyStats = async (req, res) => {
   try {
@@ -318,3 +329,25 @@ export const getTeacherMonthlyStats = async (req, res) => {
   }
 };
 
+// O‘qituvchiga xabar yuborish
+export const sendCustomMessageToTeacher = async (req, res) => {
+  try {
+    const { teacherId, message } = req.body;
+
+    // Teacherni ID orqali topish
+    const teacher = await Teacher.findById(teacherId);
+
+    if (!teacher || !teacher.chatId) {
+      return res
+        .status(404)
+        .json({ error: "O‘qituvchi yoki chatId topilmadi" });
+    }
+
+    // Telegram orqali xabar yuborish
+    await sendMessageToTeacher(teacher.chatId, message);
+
+    res.json({ success: true, message: "Xabar yuborildi ✅" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};

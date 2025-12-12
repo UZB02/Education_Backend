@@ -23,6 +23,9 @@ import roomRoutes from "./routes/roomRoutes.js"
 import subjectRoutes from "./routes/SubjectRoutes.js";
 import testsRoutes from "./routes/TestRoutes.js"
 
+// === Telegram Botlarni ishga tushirish ===
+import "./bot/bot.js";
+import "./bot/teachersBot.js";
 
 
 

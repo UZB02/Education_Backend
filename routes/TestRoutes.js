@@ -37,7 +37,6 @@ router.post("/:id/generate-link", teacherAuth, generateTestLink);
 
 // Natijalar
 router.get("/:id/results", teacherAuth, getTestResults);
-
 /**
  * ===============================
  *  O‘QUVCHI ROUTELARI (Auth YO‘Q!)

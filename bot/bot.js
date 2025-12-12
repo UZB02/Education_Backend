@@ -1,7 +1,6 @@
 import TelegramBot from "node-telegram-bot-api";
 import dotenv from "dotenv";
 import Student from "../models/studentModel.js";
-import bcrypt from "bcrypt";
 
 dotenv.config();
 
@@ -54,17 +53,7 @@ bot.on("contact", async (msg) => {
   student.chatId = chatId;
   await student.save();
 
-  // 5) Parolni formatlash (masalan bcrypt shifrdan oddiy formatga qaytmaydi)
-  // Eslatma: bcrypt parolni qayta asl holatiga ochib bo'lmaydi!
-  // Shuning uchun database’da "passwordRaw" bo‘lsa, uni yuborasiz.
-  // Agar yo‘q bo‘lsa, yangi vaqtinchalik parol generatsiya qilish mumkin.
-
   let realPassword = student.password;
-
-  if (student.passwordRaw) {
-    // Agar sizda alohida raw parol saqlanayotgan bo‘lsa
-    realPassword = student.passwordRaw;
-  }
 
   await sendMessageToUser(
     chatId,

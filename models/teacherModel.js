@@ -20,7 +20,8 @@ const teacherSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     }, // Bu avtomatik hisoblanadi
-
+    password: { type: String, required: true },
+    chatId: { type: String },
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
