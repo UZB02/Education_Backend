@@ -19,7 +19,7 @@ bot.onText(/\/start/, async (msg) => {
 
   await sendMessageToUser(
     chatId,
-    "Salom! Telefon raqamingizni yuborish uchun tugmani bosing 📱",
+    "Salom! Telefon raqamingizni yuborish uchun tugmani bosing 📱 \n!DIQQAT! \nBoshqa usulda yuborilgan telefon raqamlar xatolik berishi mumkin.",
     {
       reply_markup: {
         keyboard: [

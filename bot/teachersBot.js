@@ -22,7 +22,7 @@ bot.onText(/\/start/, async (msg) => {
 
   await sendMessageToTeacher(
     chatId,
-    "Assalomu alaykum, hurmatli o‘qituvchi! 👨‍🏫\nTelefon raqamni yuborish tugmasini bosing!",
+    "Assalomu alaykum, hurmatli o‘qituvchi! 👨‍🏫\nTelefon raqamni yuborish tugmasini bosing! \n!DIQQAT! \nBoshqa usulda yuborilgan telefon raqamlar xatolik berishi mumkin.",
     {
       reply_markup: {
         keyboard: [

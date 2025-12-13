@@ -498,3 +498,44 @@ export const sendCustomMessage = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+// Guruhdagi barcha o‘quvchilarga xabar yuborish
+export const sendMessageToGroup = async (req, res) => {
+  try {
+    const { groupId, message } = req.body;
+
+    if (!groupId || !message) {
+      return res.status(400).json({ error: "groupId yoki message yo‘q" });
+    }
+
+    // Guruhdagi barcha studentlarni olish
+    const students = await Student.find({
+      groupId, // <-- shu yerda 'groupId'
+      chatId: { $exists: true, $ne: null },
+    });
+
+    console.log("Students found:", students.length);
+
+    if (!students.length) {
+      return res
+        .status(404)
+        .json({ error: "Guruhda chatId mavjud o‘quvchilar topilmadi" });
+    }
+
+    // Har bir o‘quvchiga xabar yuborish
+    await Promise.all(
+      students.map((student) =>
+        sendMessageToUser(student.chatId, message, { parse_mode: "HTML" })
+      )
+    );
+
+    res.json({
+      success: true,
+      sentCount: students.length,
+      message: "Guruhga xabar yuborildi ✅",
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message });
+  }
+};

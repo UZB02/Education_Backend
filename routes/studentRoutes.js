@@ -6,7 +6,8 @@ import {
   deleteStudent,
   updateStudent,
   getStudentById,
-  sendCustomMessage
+  sendCustomMessage,
+  sendMessageToGroup
 } from "../controllers/studentController.js";
 
 const router = express.Router();
@@ -21,5 +22,6 @@ router.get("/byId/:id", getStudentById);
 router.delete("/:id", deleteStudent); 
 router.put("/:id", updateStudent);
 router.post("/send-message", sendCustomMessage);
+router.post("/send-group-message", sendMessageToGroup);
 
 export default router;
