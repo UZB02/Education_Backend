@@ -79,18 +79,20 @@ export const updateTest = async (req, res) => {
 export const deleteTest = async (req, res) => {
   try {
     const teacherId = req.user._id;
-    const test = await Test.findOne({ _id: req.params.id, teacherId });
-    if (!test)
+    const test = await Test.findOneAndDelete({ _id: req.params.id, teacherId });
+
+    if (!test) {
       return res
         .status(404)
         .json({ message: "Test topilmadi yoki sizga tegishli emas" });
+    }
 
-    await test.remove();
     res.json({ message: "Test o‘chirildi" });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
+
 
 // Testga yangi savol qo'shish
 export const addQuestionToTest = async (req, res) => {
