@@ -15,20 +15,20 @@ export const parentLogin = async (req, res) => {
         .json({ message: "Telefon raqam va parol kiritilmadi" });
     }
 
-    // parentPhone bo‘yicha farzandlarni topamiz
+    // parentPhone bo‘yicha farzandni topamiz
     const student = await Student.findOne({ parentPhone });
 
     if (!student) {
       return res.status(404).json({ message: "Bu raqamga farzand topilmadi" });
     }
 
-    // Password tekshirish
-    const match = await bcrypt.compare(password, student.password);
-    if (!match) {
+    // ❌ bcrypt YO‘Q
+    // ✅ oddiy string tekshiruv
+    if (password !== student.password) {
       return res.status(401).json({ message: "Noto‘g‘ri parol" });
     }
 
-    // JWT token yaratish
+    // JWT token
     const token = jwt.sign(
       { parentPhone, role: "parent" },
       process.env.JWT_SECRET,
@@ -49,6 +49,7 @@ export const parentLogin = async (req, res) => {
     res.status(500).json({ message: "Server xatosi" });
   }
 };
+
 
 // 2️⃣ Farzandning to‘lovlari
 export const getStudentPayments = async (req, res) => {
@@ -93,7 +94,7 @@ export const getChildren = async (req, res) => {
     const students = await Student.find({ parentPhone: phone })
       .populate({
         path: "groupId",
-        select: "name scheduleType days monthlyFee teacher",
+        select: "name scheduleType days monthlyFee teacher startTime endTime",
         populate: {
           path: "teacher",
           select: "name lastname science phone",
@@ -116,6 +117,8 @@ export const getChildren = async (req, res) => {
               scheduleType: student.groupId.scheduleType,
               days: student.groupId.days,
               monthlyFee: student.groupId.monthlyFee,
+              startTime: student.groupId.startTime,
+              endTime: student.groupId.endTime,
               teacher: student.groupId.teacher
                 ? {
                     name: student.groupId.teacher.name,
