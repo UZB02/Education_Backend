@@ -4,6 +4,7 @@ import {
   getStudentPayments,
   getStudentAttendance,
   getChildren,
+  getOneChild
   // getChildGroups,
 } from "../controllers/parentController.js";
 import { parentAuth } from "../middleware/parentAuth.js";
@@ -19,6 +20,7 @@ router.post("/login", parentLogin);
 
 // Ota-onaning barcha farzandlari
 router.get("/children", parentAuth, getChildren);
+router.get("/children/:id", parentAuth, getOneChild);
 
 // Muayyan farzandning guruhlari
 // router.get("/children/:id/groups", parentAuth, getChildGroups);

@@ -11,11 +11,16 @@ const groupSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
-    teacher: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Teacher",
-      default: null,
+    teachers: {
+      type: [
+        {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Teacher",
+        },
+      ],
+      default: [],
     },
+
     admin: {
       type: mongoose.Schema.Types.ObjectId,
       required: true,

@@ -2,86 +2,17 @@ import Group from "../models/groupModel.js";
 import Student from "../models/studentModel.js";
 import { calculatePaymentStatus } from "../helpers/paymentHelper.js";
 
-// GET: get all groups by adminId (from query)
-export const getAllGroups = async (req, res) => {
-  try {
-    const adminId = req.query.adminId;
-    if (!adminId) {
-      return res.status(400).json({ message: "adminId is required" });
-    }
-
-    // 1. Barcha guruhlarni olamiz
-    const groups = await Group.find({ admin: adminId }).populate("teacher");
-
-    // 2. Har bir guruh uchun studentlarni qo‘shamiz
-    const groupsWithStudents = await Promise.all(
-      groups.map(async (group) => {
-        const students = await Student.find({ groupId: group._id });
-        return {
-          ...group.toObject(),
-          students,
-        };
-      })
-    );
-
-    res.json(groupsWithStudents);
-  } catch (error) {
-    console.error("❌ getAllGroups xatolik:", error);
-    res.status(500).json({ message: "Error fetching groups", error });
-  }
-};
-
-export const getGroupById = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { adminId } = req.query;
-
-    if (!adminId) {
-      return res.status(400).json({ message: "adminId is required" });
-    }
-
-    // Guruhni topamiz
-    const group = await Group.findOne({ _id: id, admin: adminId }).populate(
-      "teacher"
-    );
-    if (!group) {
-      return res.status(404).json({ message: "Group not found" });
-    }
-
-    // Shu guruhdagi studentlarni olamiz
-    const students = await Student.find({ groupId: id });
-
-    // Har bir student uchun paymentStatus hisoblaymiz
-    const studentsWithPaymentStatus = await Promise.all(
-      students.map(async (student) => {
-        const status = await calculatePaymentStatus(student, group);
-        return {
-          ...student.toObject(),
-          paymentStatus: status,
-        };
-      })
-    );
-
-    // Natijani qaytaramiz
-    res.json({
-      ...group.toObject(),
-      students: studentsWithPaymentStatus,
-    });
-  } catch (error) {
-    console.error("getGroupById error:", error);
-    res.status(500).json({ message: "Error fetching group", error });
-  }
-};
-
-// 12h yoki 24h formatdagi vaqtni 24h formatga o‘girish funksiyasi
+/* =========================
+   ⏱ Time helper
+========================= */
 const to24HourFormat = (time) => {
   if (!time) return null;
 
-  // Agar time allaqachon 24h formatda bo'lsa (HH:mm)
+  // 24h format: HH:mm
   const match24 = time.match(/^([01]?\d|2[0-3]):([0-5]\d)$/);
   if (match24) return time;
 
-  // 12h format (hh:mm AM/PM)
+  // 12h format: hh:mm AM/PM
   const match12 = time.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
   if (!match12) return null;
 
@@ -95,52 +26,135 @@ const to24HourFormat = (time) => {
   return `${hours.toString().padStart(2, "0")}:${minutes}`;
 };
 
-// POST: create group with adminId
-export const createGroup = async (req, res) => {
+/* =========================
+   GET all groups (by admin)
+========================= */
+export const getAllGroups = async (req, res) => {
   try {
-    const {
-      name,
-      description,
-      teacher,
-      monthlyFee,
-      adminId,
-      scheduleType,
-      days,
-      startTime,
-      endTime,
-    } = req.body;
+    const { adminId } = req.query;
+    if (!adminId) {
+      return res.status(400).json({ message: "adminId is required" });
+    }
+
+    const groups = await Group.find({ admin: adminId }).populate("teachers");
+
+    const groupsWithStudents = await Promise.all(
+      groups.map(async (group) => {
+        const students = await Student.find({ groupId: group._id });
+        return {
+          ...group.toObject(),
+          students,
+        };
+      })
+    );
+
+    res.json(groupsWithStudents);
+  } catch (error) {
+    console.error("❌ getAllGroups error:", error);
+    res.status(500).json({ message: "Error fetching groups" });
+  }
+};
+
+/* =========================
+   GET group by ID
+========================= */
+export const getGroupById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { adminId } = req.query;
 
     if (!adminId) {
       return res.status(400).json({ message: "adminId is required" });
     }
 
-    // 24 soatlik formatga o‘girish
+    const group = await Group.findOne({
+      _id: id,
+      admin: adminId,
+    }).populate("teachers");
+
+    if (!group) {
+      return res.status(404).json({ message: "Group not found" });
+    }
+
+    const students = await Student.find({ groupId: id });
+
+    const studentsWithPaymentStatus = await Promise.all(
+      students.map(async (student) => {
+        const status = await calculatePaymentStatus(student, group);
+        return {
+          ...student.toObject(),
+          paymentStatus: status,
+        };
+      })
+    );
+
+    res.json({
+      ...group.toObject(),
+      students: studentsWithPaymentStatus,
+    });
+  } catch (error) {
+    console.error("❌ getGroupById error:", error);
+    res.status(500).json({ message: "Error fetching group" });
+  }
+};
+
+/* =========================
+   CREATE group
+========================= */
+export const createGroup = async (req, res) => {
+  try {
+    const {
+      name,
+      description,
+      teachers,
+      monthlyFee,
+      adminId,
+      scheduleType = "custom",
+      days,
+      startTime,
+      endTime,
+    } = req.body;
+
+    if (!name || !monthlyFee || !adminId || !startTime || !endTime) {
+      return res.status(400).json({
+        message: "name, monthlyFee, adminId, startTime, endTime majburiy",
+      });
+    }
+
+    if (teachers && !Array.isArray(teachers)) {
+      return res.status(400).json({
+        message: "teachers must be an array",
+      });
+    }
+
     const finalStartTime = to24HourFormat(startTime);
     const finalEndTime = to24HourFormat(endTime);
 
     if (!finalStartTime || !finalEndTime) {
-      return res
-        .status(400)
-        .json({ message: "startTime va endTime noto‘g‘ri formatda" });
+      return res.status(400).json({
+        message: "startTime yoki endTime noto‘g‘ri formatda",
+      });
     }
 
-    // Agar custom bo‘lsa -> days kerak
-    let finalDays = days;
+    let finalDays = [];
     if (scheduleType === "toq") {
       finalDays = ["Dushanba", "Chorshanba", "Juma"];
     } else if (scheduleType === "juft") {
       finalDays = ["Seshanba", "Payshanba", "Shanba"];
-    } else if (scheduleType === "custom" && (!days || days.length === 0)) {
-      return res
-        .status(400)
-        .json({ message: "Custom schedule requires days array" });
+    } else if (scheduleType === "custom") {
+      if (!days || !Array.isArray(days) || days.length === 0) {
+        return res.status(400).json({
+          message: "Custom schedule uchun days array majburiy",
+        });
+      }
+      finalDays = days;
     }
 
     const newGroup = new Group({
-      name,
+      name: name.trim(),
+      description: description || "",
+      teachers: teachers || [],
       monthlyFee,
-      description,
-      teacher,
       admin: adminId,
       scheduleType,
       days: finalDays,
@@ -153,17 +167,20 @@ export const createGroup = async (req, res) => {
     const savedGroup = await newGroup.save();
     res.status(201).json(savedGroup);
   } catch (error) {
-    res.status(400).json({ message: "Error creating group", error });
+    console.error("❌ createGroup error:", error);
+    res.status(500).json({ message: "Error creating group" });
   }
 };
 
-// PUT: update group only if adminId matches
+/* =========================
+   UPDATE group
+========================= */
 export const updateGroup = async (req, res) => {
   try {
     const {
       name,
       description,
-      teacher,
+      teachers,
       monthlyFee,
       adminId,
       scheduleType,
@@ -171,41 +188,47 @@ export const updateGroup = async (req, res) => {
       startTime,
       endTime,
     } = req.body;
+
     const { id } = req.params;
 
     if (!adminId) {
       return res.status(400).json({ message: "adminId is required" });
     }
 
-    // 24 soatlik formatga o‘girish
+    if (teachers && !Array.isArray(teachers)) {
+      return res.status(400).json({ message: "teachers must be an array" });
+    }
+
     const finalStartTime = to24HourFormat(startTime);
     const finalEndTime = to24HourFormat(endTime);
 
     if (!finalStartTime || !finalEndTime) {
-      return res
-        .status(400)
-        .json({ message: "startTime va endTime noto‘g‘ri formatda" });
+      return res.status(400).json({
+        message: "startTime yoki endTime noto‘g‘ri formatda",
+      });
     }
 
-    // scheduleType asosida finalDays
-    let finalDays = days;
+    let finalDays = [];
     if (scheduleType === "toq") {
       finalDays = ["Dushanba", "Chorshanba", "Juma"];
     } else if (scheduleType === "juft") {
       finalDays = ["Seshanba", "Payshanba", "Shanba"];
-    } else if (scheduleType === "custom" && (!days || days.length === 0)) {
-      return res
-        .status(400)
-        .json({ message: "Custom schedule requires days array" });
+    } else if (scheduleType === "custom") {
+      if (!days || !Array.isArray(days) || days.length === 0) {
+        return res.status(400).json({
+          message: "Custom schedule requires days array",
+        });
+      }
+      finalDays = days;
     }
 
     const updatedGroup = await Group.findOneAndUpdate(
       { _id: id, admin: adminId },
       {
         name,
-        monthlyFee,
         description,
-        teacher,
+        teachers,
+        monthlyFee,
         scheduleType,
         days: finalDays,
         startTime: finalStartTime,
@@ -223,12 +246,14 @@ export const updateGroup = async (req, res) => {
 
     res.json(updatedGroup);
   } catch (error) {
-    res.status(400).json({ message: "Error updating group", error });
+    console.error("❌ updateGroup error:", error);
+    res.status(500).json({ message: "Error updating group" });
   }
 };
 
-
-// DELETE: delete group only if adminId matches
+/* =========================
+   DELETE group
+========================= */
 export const deleteGroup = async (req, res) => {
   try {
     const { adminId } = req.query;
@@ -251,6 +276,7 @@ export const deleteGroup = async (req, res) => {
 
     res.json({ message: "Group deleted successfully" });
   } catch (error) {
-    res.status(500).json({ message: "Error deleting group", error });
+    console.error("❌ deleteGroup error:", error);
+    res.status(500).json({ message: "Error deleting group" });
   }
 };

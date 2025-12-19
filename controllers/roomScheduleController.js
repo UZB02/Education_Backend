@@ -103,7 +103,7 @@ export const getRoomSchedule = async (req, res) => {
       .populate({
         path: "groupId",
         populate: {
-          path: "teacher",
+          path: "teachers",
           select: "name lastname phone", // faqat kerakli maydonlar
         },
       })
@@ -130,7 +130,7 @@ export const getAllSchedules = async (req, res) => {
       .populate({
         path: "groupId",
         populate: {
-          path: "teacher",
+          path: "teachers",
           select: "name lastname phone", // faqat kerakli maydonlar
         },
       });
