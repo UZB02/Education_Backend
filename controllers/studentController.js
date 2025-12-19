@@ -47,34 +47,156 @@ export const getAllStudents = async (req, res) => {
       Student.countDocuments({ admin: adminId }),
     ]);
 
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth();
-    const startDate = new Date(year, month, 1);
-    const endDate = new Date(year, month + 1, 0, 23, 59, 59);
-
     const students = await Promise.all(
       studentsRaw.map(async (student) => {
         const group = student.groupId;
         let paymentStatus = null;
 
-        if (group && group.monthlyFee) {
-          const payments = await Payment.find({
+        if (group) {
+          const startDate = student.joinedAt || student.createdAt;
+          const now = new Date();
+
+          const months = [];
+          let current = new Date(
+            startDate.getFullYear(),
+            startDate.getMonth(),
+            1
+          );
+
+          const allPayments = await Payment.find({
             studentId: student._id,
-            paidAt: { $gte: startDate, $lte: endDate },
+          }).sort({
+            paidAt: 1,
           });
 
-          const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
-          const isPaid = totalPaid >= group.monthlyFee;
-          const remainingAmount = Math.max(group.monthlyFee - totalPaid, 0);
+          let paymentPool = allPayments.map((p) => p.amount);
+          let paymentIndex = 0;
+
+          let totalPaidAll = 0;
+          let carryOver = 0;
+          let carryOverTotalUsed = 0;
+
+          while (current <= now) {
+            const year = current.getFullYear();
+            const month = current.getMonth();
+
+            // Agar group.days mavjud bo'lsa, oylik kunlarni hisoblash
+            const allDaysInMonth =
+              group.days?.reduce(
+                (sum, day) =>
+                  sum + getTotalDaysInMonth(year, month, dayToIndex[day]),
+                0
+              ) || 0;
+
+            let daysLeft = allDaysInMonth;
+            if (
+              year === startDate.getFullYear() &&
+              month === startDate.getMonth()
+            ) {
+              daysLeft =
+                group.days?.reduce(
+                  (sum, day) =>
+                    sum +
+                    getRemainingDaysInMonth(
+                      year,
+                      month,
+                      dayToIndex[day],
+                      startDate.getDate()
+                    ),
+                  0
+                ) || 0;
+            }
+
+            const kursFee = calculateMonthlyFee(group, year, month);
+            const rawFee =
+              allDaysInMonth > 0
+                ? Math.round(kursFee * (daysLeft / allDaysInMonth))
+                : 0;
+            const adjustedFee = rawFee;
+
+            // Haqdorlikni ishlatib yuborish
+            let carryOverUsed = Math.min(carryOver, adjustedFee);
+            let requiredFee = adjustedFee - carryOverUsed;
+            carryOver -= carryOverUsed;
+            carryOverTotalUsed += carryOverUsed;
+
+            let totalPaid = 0;
+            while (paymentIndex < paymentPool.length) {
+              const available = paymentPool[paymentIndex];
+
+              if (totalPaid < requiredFee) {
+                const remainingNeed = requiredFee - totalPaid;
+
+                if (available <= remainingNeed) {
+                  totalPaid += available;
+                  paymentIndex++;
+                } else {
+                  totalPaid += remainingNeed;
+                  carryOver += available - remainingNeed;
+                  paymentIndex++;
+                }
+              } else {
+                carryOver += available;
+                paymentIndex++;
+              }
+            }
+
+            totalPaidAll += totalPaid;
+
+            const remainingAmount = Math.max(requiredFee - totalPaid, 0);
+            const overpaidAmount = Math.max(
+              totalPaid + carryOverUsed - adjustedFee,
+              0
+            );
+
+            months.push({
+              month: current.toLocaleString("uz-UZ", {
+                month: "long",
+                year: "numeric",
+              }),
+              kursFee,
+              rawFee,
+              adjustedFee,
+              carryOverUsed,
+              totalPaid,
+              remainingAmount,
+              overpaidAmount,
+              message:
+                remainingAmount === 0
+                  ? overpaidAmount > 0
+                    ? "Haqdor"
+                    : "To'langan"
+                  : "Qarzdor",
+            });
+
+            current.setMonth(current.getMonth() + 1);
+          }
+
+          const shouldPayTotal = months.reduce(
+            (sum, m) => sum + m.adjustedFee,
+            0
+          );
+          const remainingAmountAll = months.reduce(
+            (sum, m) => sum + m.remainingAmount,
+            0
+          );
+          const overpaidAmountAll = carryOver;
+          const isPaid = remainingAmountAll === 0;
+          const overallMessage = isPaid
+            ? overpaidAmountAll > 0
+              ? "Haqdor"
+              : "To'langan"
+            : "Qarzdor";
 
           paymentStatus = {
+            months,
+            totalPaid: totalPaidAll,
+            shouldPayTotal,
+            remainingAmount: remainingAmountAll,
+            overpaidAmount: overpaidAmountAll,
+            overpaidAmountUsed: carryOverTotalUsed,
             isPaid,
-            totalPaid,
-            remainingAmount,
-            message: isPaid
-              ? "To'langan"
-              : "Qarzdor",
+            overallMessage,
           };
         }
 
@@ -96,6 +218,7 @@ export const getAllStudents = async (req, res) => {
     res.status(500).json({ message: "Xatolik yuz berdi", error });
   }
 };
+
 
 // Tasodifiy 6 xonali parol yaratish
 function generatePassword() {
