@@ -46,26 +46,39 @@ export const getTeacherById = async (req, res) => {
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
-    const groups = await Group.find({ teacher: id }).select("_id");
+    // 🔹 Teacherga tegishli guruhlarni olish
+    const groups = await Group.find({ teachers: id }).select("_id");
     const groupIds = groups.map((g) => g._id);
 
+    // 🔹 Guruhga tegishli o‘quvchilar
     const students = await Student.find({ groupId: { $in: groupIds } }).select(
       "_id"
     );
     const studentIds = students.map((s) => s._id);
 
+    // 🔹 Shu oyda qilgan to‘lovlar
     const payments = await Payment.find({
       studentId: { $in: studentIds },
       paidAt: { $gte: monthStart, $lte: monthEnd },
     });
 
     const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
-    const calculatedSalary = (totalPaid * teacher.percentage) / 100;
+
+    // 🔹 Hisoblangan maosh
+    let calculatedSalary = 0;
+    if (teacher.fixedSalary && teacher.fixedSalary > 0) {
+      // Agar fixed salary belgilangan bo‘lsa, uni olamiz
+      calculatedSalary = teacher.fixedSalary;
+    } else {
+      // Aks holda foiz asosida hisoblaymiz
+      calculatedSalary = (totalPaid * teacher.percentage) / 100;
+    }
 
     const currentMonth = `${now.getFullYear()}-${String(
       now.getMonth() + 1
     ).padStart(2, "0")}`;
 
+    // 🔹 Shu oyda o‘qituvchiga berilgan oyliklar tarixi
     const paidSalaries = await SalaryHistory.find({
       teacherId: id,
       month: currentMonth,
@@ -74,7 +87,7 @@ export const getTeacherById = async (req, res) => {
     const totalPaidOut = paidSalaries.reduce((sum, s) => sum + s.amount, 0);
     const remainingSalary = calculatedSalary - totalPaidOut;
 
-    // 🧮 Qarzdorlik (agar ko‘proq to‘langan bo‘lsa)
+    // 🔹 Qarzdorlik (agar ko‘proq to‘langan bo‘lsa)
     const overpaidAmount =
       totalPaidOut > calculatedSalary ? totalPaidOut - calculatedSalary : 0;
 
@@ -84,6 +97,7 @@ export const getTeacherById = async (req, res) => {
       salaryStats: {
         month: currentMonth,
         percentage: teacher.percentage,
+        fixedSalary: teacher.fixedSalary,
         totalCollectedFromStudents: totalPaid,
         calculatedSalary,
         totalPaidOut,
@@ -98,13 +112,15 @@ export const getTeacherById = async (req, res) => {
   }
 };
 
+
 function generateRandomPassword() {
   return Math.random().toString(36).slice(-8);
 }
 
 export const createTeacher = async (req, res) => {
   try {
-    const { name, lastname, science, userId, phone, percentage } = req.body;
+    const { name, lastname, science, userId, phone, percentage, fixedSalary } =
+      req.body;
 
     if (!name || !lastname || !science || !userId) {
       return res
@@ -112,23 +128,24 @@ export const createTeacher = async (req, res) => {
         .json({ message: "Barcha maydonlar to‘ldirilishi shart" });
     }
 
-    // 🔥 1. Random parol yaratamiz
+    // 🔥 Random parol yaratamiz
     const rawPassword = generateRandomPassword();
 
-    // 🔥 2. Teacher yaratamiz (hashlashing shart emas)
+    // 🔥 Teacher yaratamiz
     const newTeacher = new Teacher({
       name,
       lastname,
       science,
       userId,
       phone,
-      percentage,
+      percentage: Number(percentage) || 0, // foiz
+      fixedSalary: Number(fixedSalary) || 0, // belgilangan summa
       password: rawPassword, // ❗ HASH YO‘Q
     });
 
     await newTeacher.save();
 
-    // 🔥 3. Parolni qaytaramiz (botga yuborish uchun)
+    // 🔥 Parolni qaytaramiz (botga yuborish uchun)
     res.status(201).json({
       message: "O‘qituvchi muvaffaqiyatli yaratildi",
       teacher: newTeacher,
@@ -139,11 +156,13 @@ export const createTeacher = async (req, res) => {
   }
 };
 
+
 // PUT: O'qituvchini yangilash
 export const updateTeacher = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, lastname, science, userId, phone, percentage } = req.body;
+    const { name, lastname, science, userId, phone, percentage, fixedSalary } =
+      req.body;
 
     const teacher = await Teacher.findOne({ _id: id, userId });
     if (!teacher) {
@@ -154,16 +173,24 @@ export const updateTeacher = async (req, res) => {
     if (lastname) teacher.lastname = lastname;
     if (science) teacher.science = science;
     if (phone) teacher.phone = phone;
+
+    // 🔹 Foizni yangilash
     if (typeof percentage !== "undefined") {
-      teacher.percentage = percentage;
+      teacher.percentage = Number(percentage) || 0;
     }
 
-    await teacher.save(); // 🟢 BU ham kerak
+    // 🔹 Belgilangan summani yangilash
+    if (typeof fixedSalary !== "undefined") {
+      teacher.fixedSalary = Number(fixedSalary) || 0;
+    }
+
+    await teacher.save();
     res.status(200).json({ message: "O‘qituvchi yangilandi", teacher });
   } catch (error) {
     res.status(500).json({ message: "Yangilashda xatolik", error });
   }
 };
+
 
 // DELETE: Faqat o‘zining o‘qituvchisini o‘chirish
 export const deleteTeacher = async (req, res) => {
@@ -231,7 +258,7 @@ export const subtractPointsFromTeacher = async (req, res) => {
   }
 };
 
-// 👉 Ichki foydalanish uchun qayta yozilgan versiya
+// Ichki foydalanish uchun – joriy oy maoshini hisoblash
 const calculateTeacherSalaryInternal = async (teacherId) => {
   const teacher = await Teacher.findById(teacherId);
   if (!teacher) return null;
@@ -242,9 +269,7 @@ const calculateTeacherSalaryInternal = async (teacherId) => {
   const groups = await Group.find({ teacher: teacherId }).select("_id");
   const groupIds = groups.map((group) => group._id);
 
-  const students = await Student.find({ groupId: { $in: groupIds } }).select(
-    "_id"
-  );
+  const students = await Student.find({ groupId: { $in: groupIds } }).select("_id");
   const studentIds = students.map((student) => student._id);
 
   const payments = await Payment.find({
@@ -253,13 +278,22 @@ const calculateTeacherSalaryInternal = async (teacherId) => {
   });
 
   const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
-  const salary = (totalPaid * teacher.percentage) / 100;
+
+  // 🔹 Foiz yoki fixedSalaryga moslab hisoblash
+  let salary = 0;
+  if (teacher.fixedSalary && teacher.fixedSalary > 0) {
+    salary = teacher.fixedSalary;
+  } else {
+    salary = (totalPaid * teacher.percentage) / 100;
+  }
 
   teacher.monthlySalary = salary;
   await teacher.save();
 
   return salary;
 };
+
+
 
 export const getTeacherMonthlyStats = async (req, res) => {
   try {
@@ -274,17 +308,14 @@ export const getTeacherMonthlyStats = async (req, res) => {
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
-    // O‘qituvchining guruhlarini topamiz
     const groups = await Group.find({ teacher: teacherId }).select("_id");
     const groupIds = groups.map((g) => g._id);
 
-    // Guruhga tegishli o‘quvchilar
     const students = await Student.find({ groupId: { $in: groupIds } }).select(
       "_id"
     );
     const studentIds = students.map((s) => s._id);
 
-    // O‘quvchilar shu oyda qilgan to‘lovlar
     const payments = await Payment.find({
       studentId: { $in: studentIds },
       paidAt: { $gte: monthStart, $lte: monthEnd },
@@ -292,20 +323,24 @@ export const getTeacherMonthlyStats = async (req, res) => {
 
     const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
 
-    // Hisoblangan oylik = foiz asosida
-    const calculatedSalary = (totalPaid * teacher.percentage) / 100;
+    // 🔹 Foiz yoki fixedSalaryga moslab hisoblash
+    let calculatedSalary = 0;
+    if (teacher.fixedSalary && teacher.fixedSalary > 0) {
+      calculatedSalary = teacher.fixedSalary;
+    } else {
+      calculatedSalary = (totalPaid * teacher.percentage) / 100;
+    }
 
-    // O‘qituvchiga shu oyda berilgan oyliklar
+    const currentMonth = `${now.getFullYear()}-${String(
+      now.getMonth() + 1
+    ).padStart(2, "0")}`;
+
     const paidSalaries = await SalaryHistory.find({
       teacherId: teacherId,
-      month: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(
-        2,
-        "0"
-      )}`,
+      month: currentMonth,
     });
 
     const totalPaidOut = paidSalaries.reduce((sum, s) => sum + s.amount, 0);
-
     const remainingSalary = calculatedSalary - totalPaidOut;
 
     res.json({
@@ -313,11 +348,9 @@ export const getTeacherMonthlyStats = async (req, res) => {
         name: teacher.name,
         lastname: teacher.lastname,
         percentage: teacher.percentage,
+        fixedSalary: teacher.fixedSalary,
       },
-      month: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(
-        2,
-        "0"
-      )}`,
+      month: currentMonth,
       totalCollectedFromStudents: totalPaid,
       calculatedSalary,
       totalPaidOut,
